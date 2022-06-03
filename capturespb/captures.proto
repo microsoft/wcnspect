@@ -1,0 +1,19 @@
+syntax = "proto3";
+
+package captures;
+option go_package = "/capturespb";
+
+// request
+message CaptureRequest {
+	int32 duration = 1;
+}
+
+// response
+message CaptureResponse {
+	string result = 1;
+}
+
+service CaptureService {
+	// server streaming
+	rpc StartCapture(CaptureRequest) returns (stream CaptureResponse) {}
+}
