@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io"
 	"log"
+	"sync"
 
 	"winspect/capturespb"
 
@@ -12,7 +13,30 @@ import (
 )
 
 func main() {
-	cc, err := grpc.Dial("localhost:50051", grpc.WithInsecure())
+	var wg sync.WaitGroup
+	var ips = []string{
+		//"localhost:50051",
+		"10.216.116.143:50051", // corresponding to t-nikoVM1
+		"10.216.119.237:50051", // corresponding to t-nikoVM2
+	}
+
+	for _, ip := range ips {
+		// Increment the WaitGroup counter.
+		wg.Add(1)
+
+		// Launch a goroutine to run the capture.
+		go createConnection(ip, &wg)
+	}
+
+	// Wait for all captures to complete.
+	wg.Wait()
+}
+
+func createConnection(ip string, wg *sync.WaitGroup) {
+	// Decrement relevant waitgroup counter when goroutine completes.
+	defer wg.Done()
+
+	cc, err := grpc.Dial(ip, grpc.WithInsecure())
 	if err != nil {
 		log.Fatalf("could not connect: %v", err)
 	}
@@ -20,17 +44,17 @@ func main() {
 
 	c := capturespb.NewCaptureServiceClient(cc)
 
-	doServerStreaming(c)
+	doServerStreaming(c, ip)
 }
 
-func doServerStreaming(c capturespb.CaptureServiceClient) {
-	fmt.Println("Starting to do a Server Streaming RPC...")
+func doServerStreaming(c capturespb.CaptureServiceClient, ip string) {
+	fmt.Printf("Starting to do a Server Streaming RPC (from IP: %s)...\n", ip)
 
-	req := &capturespb.CaptureRequest{Duration: 10}
+	req := &capturespb.CaptureRequest{Duration: 4}
 
 	resStream, err := c.StartCapture(context.Background(), req)
 	if err != nil {
-		log.Fatalf("error while calling StartCapture RPC: %v", err)
+		log.Fatalf("error while calling StartCapture RPC (from IP: %s): %v", ip, err)
 	}
 
 	for {
@@ -41,9 +65,9 @@ func doServerStreaming(c capturespb.CaptureServiceClient) {
 		}
 
 		if err != nil {
-			log.Fatalf("error while reading stream: %v", err)
+			log.Fatalf("error while reading stream (from IP: %s): %v", ip, err)
 		}
 
-		fmt.Printf("Response from StartCapture: %v\n", msg.GetResult())
+		fmt.Printf("Response from StartCapture (%s): %v\n", ip, msg.GetResult())
 	}
 }
