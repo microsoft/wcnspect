@@ -15,6 +15,7 @@ import (
 
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/reflection"
+	"google.golang.org/protobuf/types/known/timestamppb"
 )
 
 type server struct {
@@ -53,10 +54,11 @@ func (*server) StartCapture(req *capturespb.CaptureRequest, stream capturespb.Ca
 		// loop main body
 		m := scanner.Text()
 		res := &capturespb.CaptureResponse{
-			Result: m,
+			Result:    m,
+			Timestamp: timestamppb.Now(),
 		}
 		stream.Send(res)
-		log.Printf("Sent: %v", res)
+		log.Printf("Sent: \n%v", res)
 		i++
 	}
 

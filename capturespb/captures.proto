@@ -1,5 +1,7 @@
 syntax = "proto3";
 
+import "google/protobuf/timestamp.proto";
+
 package captures;
 option go_package = "/capturespb";
 
@@ -11,11 +13,13 @@ message Empty {
 // requests
 message CaptureRequest {
 	int32 duration = 1;
+	google.protobuf.Timestamp timestamp = 2;
 }
 
 // responses
 message CaptureResponse {
 	string result = 1;
+	google.protobuf.Timestamp timestamp = 2;
 }
 
 // service

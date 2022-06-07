@@ -10,13 +10,14 @@ import (
 	"winspect/capturespb"
 
 	"google.golang.org/grpc"
+	"google.golang.org/protobuf/types/known/timestamppb"
 )
 
 func main() {
 	var wg sync.WaitGroup
 	var ips = []string{
-		//"localhost:50051",
-		"10.216.116.143:50051", // corresponding to t-nikoVM1
+		"localhost:50051",
+		//"10.216.116.143:50051", // corresponding to t-nikoVM1
 		//"10.216.119.237:50051", // corresponding to t-nikoVM2
 		//"10.224.0.35:50051", // corresponding to internal aks windows node
 		//"10.224.0.67:50051", // corresponding to internal aks subnet myVM2
@@ -52,7 +53,10 @@ func createConnection(ip string, wg *sync.WaitGroup) {
 func doServerStreaming(c capturespb.CaptureServiceClient, ip string) {
 	fmt.Printf("Starting to do a Server Streaming RPC (from IP: %s)...\n", ip)
 
-	req := &capturespb.CaptureRequest{Duration: 4}
+	req := &capturespb.CaptureRequest{
+		Duration:  4,
+		Timestamp: timestamppb.Now(),
+	}
 
 	resStream, err := c.StartCapture(context.Background(), req)
 	if err != nil {
@@ -70,6 +74,6 @@ func doServerStreaming(c capturespb.CaptureServiceClient, ip string) {
 			log.Fatalf("error while reading stream (from IP: %s): %v", ip, err)
 		}
 
-		fmt.Printf("Response from StartCapture (%s): %v\n", ip, msg.GetResult())
+		fmt.Printf("Response from StartCapture (%s) sent at %s: \n%v\n", ip, msg.GetTimestamp().AsTime(), msg.GetResult())
 	}
 }
