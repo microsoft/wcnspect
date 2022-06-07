@@ -3,17 +3,25 @@ syntax = "proto3";
 package captures;
 option go_package = "/capturespb";
 
-// request
+// models
+message Empty {
+
+}
+
+// requests
 message CaptureRequest {
 	int32 duration = 1;
 }
 
-// response
+// responses
 message CaptureResponse {
 	string result = 1;
 }
 
+// service
 service CaptureService {
 	// server streaming
 	rpc StartCapture(CaptureRequest) returns (stream CaptureResponse) {}
+	
+	rpc StopCapture(Empty) returns (Empty) {}
 }

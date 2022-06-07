@@ -2,10 +2,13 @@ package main
 
 import (
 	"bufio"
+	"context"
+	"flag"
 	"fmt"
 	"log"
 	"net"
 	"os/exec"
+	"strconv"
 	"time"
 
 	"winspect/capturespb"
@@ -20,9 +23,10 @@ type server struct {
 
 func (*server) StartCapture(req *capturespb.CaptureRequest, stream capturespb.CaptureService_StartCaptureServer) error {
 	fmt.Printf("StartCapture function was invoked with %v\n", req)
-	dur := req.GetDuration() //TODO: default is already 0, make runtime infinite
+	dur := req.GetDuration()
 
-	// execute command and check for errors
+	// ensure pktmon isn't running, then execute command and check for errors
+	exec.Command("cmd", "/c", "pktmon stop").Run()
 	cmd := exec.Command("cmd", "/c", "pktmon start -c -m real-time")
 	stdout, err := cmd.StdoutPipe()
 
@@ -40,7 +44,8 @@ func (*server) StartCapture(req *capturespb.CaptureRequest, stream capturespb.Ca
 	for start := time.Now(); scanner.Scan(); {
 		// only check timeout every 10 iterations
 		if i%10 == 0 {
-			if time.Since(start) > time.Second*time.Duration(dur) {
+			// if dur < 0, run until client sends StopCapture
+			if dur > 0 && time.Since(start) > time.Second*time.Duration(dur) {
 				break
 			}
 		}
@@ -56,13 +61,35 @@ func (*server) StartCapture(req *capturespb.CaptureRequest, stream capturespb.Ca
 	}
 
 	// Stop pktmon if still running
-	exec.Command("cmd", "/c", "pktmon stop").Run()
+	if err := exec.Command("cmd", "/c", "pktmon stop").Run(); err != nil {
+		log.Printf("failed to stop pktmon at end of stream: %v", err)
+	}
 
 	return nil
 }
 
+func (*server) StopCapture(ctx context.Context, req *capturespb.Empty) (*capturespb.Empty, error) {
+	if err := exec.Command("cmd", "/c", "pktmon stop").Run(); err != nil {
+		log.Printf("failed to stop pktmon: %v", err)
+	}
+
+	return req, nil
+}
+
 func main() {
-	listener, err := net.Listen("tcp", "0.0.0.0:50051")
+	// User variables declaration
+	var port string
+
+	// Flags declaration
+	flag.StringVar(&port, "p", "50051", "Specify port for server to listen on. Default is 50051.")
+	flag.Parse()
+
+	// Input validation
+	if _, err := strconv.Atoi(port); err != nil {
+		log.Fatalf("Supplied value was not a valid port.")
+	}
+
+	listener, err := net.Listen("tcp", "0.0.0.0:"+port)
 	if err != nil {
 		log.Fatalf("failed to listen: %v", err)
 	}

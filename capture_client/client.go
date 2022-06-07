@@ -17,23 +17,25 @@ func main() {
 	var ips = []string{
 		//"localhost:50051",
 		"10.216.116.143:50051", // corresponding to t-nikoVM1
-		"10.216.119.237:50051", // corresponding to t-nikoVM2
+		//"10.216.119.237:50051", // corresponding to t-nikoVM2
+		//"10.224.0.35:50051", // corresponding to internal aks windows node
+		//"10.224.0.67:50051", // corresponding to internal aks subnet myVM2
 	}
 
 	for _, ip := range ips {
-		// Increment the WaitGroup counter.
+		// Increment the WaitGroup counter
 		wg.Add(1)
 
-		// Launch a goroutine to run the capture.
+		// Launch a goroutine to run the capture
 		go createConnection(ip, &wg)
 	}
 
-	// Wait for all captures to complete.
+	// Wait for all captures to complete
 	wg.Wait()
 }
 
 func createConnection(ip string, wg *sync.WaitGroup) {
-	// Decrement relevant waitgroup counter when goroutine completes.
+	// Decrement relevant waitgroup counter when goroutine completes
 	defer wg.Done()
 
 	cc, err := grpc.Dial(ip, grpc.WithInsecure())

@@ -20,6 +20,7 @@ const _ = grpc.SupportPackageIsVersion7
 type CaptureServiceClient interface {
 	// server streaming
 	StartCapture(ctx context.Context, in *CaptureRequest, opts ...grpc.CallOption) (CaptureService_StartCaptureClient, error)
+	StopCapture(ctx context.Context, in *Empty, opts ...grpc.CallOption) (*Empty, error)
 }
 
 type captureServiceClient struct {
@@ -62,12 +63,22 @@ func (x *captureServiceStartCaptureClient) Recv() (*CaptureResponse, error) {
 	return m, nil
 }
 
+func (c *captureServiceClient) StopCapture(ctx context.Context, in *Empty, opts ...grpc.CallOption) (*Empty, error) {
+	out := new(Empty)
+	err := c.cc.Invoke(ctx, "/captures.CaptureService/StopCapture", in, out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // CaptureServiceServer is the server API for CaptureService service.
 // All implementations must embed UnimplementedCaptureServiceServer
 // for forward compatibility
 type CaptureServiceServer interface {
 	// server streaming
 	StartCapture(*CaptureRequest, CaptureService_StartCaptureServer) error
+	StopCapture(context.Context, *Empty) (*Empty, error)
 	mustEmbedUnimplementedCaptureServiceServer()
 }
 
@@ -77,6 +88,9 @@ type UnimplementedCaptureServiceServer struct {
 
 func (UnimplementedCaptureServiceServer) StartCapture(*CaptureRequest, CaptureService_StartCaptureServer) error {
 	return status.Errorf(codes.Unimplemented, "method StartCapture not implemented")
+}
+func (UnimplementedCaptureServiceServer) StopCapture(context.Context, *Empty) (*Empty, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method StopCapture not implemented")
 }
 func (UnimplementedCaptureServiceServer) mustEmbedUnimplementedCaptureServiceServer() {}
 
@@ -112,13 +126,36 @@ func (x *captureServiceStartCaptureServer) Send(m *CaptureResponse) error {
 	return x.ServerStream.SendMsg(m)
 }
 
+func _CaptureService_StopCapture_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(Empty)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(CaptureServiceServer).StopCapture(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: "/captures.CaptureService/StopCapture",
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(CaptureServiceServer).StopCapture(ctx, req.(*Empty))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 // CaptureService_ServiceDesc is the grpc.ServiceDesc for CaptureService service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
 var CaptureService_ServiceDesc = grpc.ServiceDesc{
 	ServiceName: "captures.CaptureService",
 	HandlerType: (*CaptureServiceServer)(nil),
-	Methods:     []grpc.MethodDesc{},
+	Methods: []grpc.MethodDesc{
+		{
+			MethodName: "StopCapture",
+			Handler:    _CaptureService_StopCapture_Handler,
+		},
+	},
 	Streams: []grpc.StreamDesc{
 		{
 			StreamName:    "StartCapture",
