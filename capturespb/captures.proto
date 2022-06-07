@@ -6,6 +6,13 @@ package captures;
 option go_package = "/capturespb";
 
 // models
+message Filters {
+	repeated string ips = 1;
+	repeated string protocols = 2;
+	repeated string ports = 3;
+	repeated string macs = 4;
+}
+
 message Empty {
 
 }
@@ -14,6 +21,7 @@ message Empty {
 message CaptureRequest {
 	int32 duration = 1;
 	google.protobuf.Timestamp timestamp = 2;
+	Filters filter = 3;
 }
 
 // responses

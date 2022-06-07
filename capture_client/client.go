@@ -53,11 +53,19 @@ func createConnection(ip string, wg *sync.WaitGroup) {
 func doServerStreaming(c capturespb.CaptureServiceClient, ip string) {
 	fmt.Printf("Starting to do a Server Streaming RPC (from IP: %s)...\n", ip)
 
+	// Create request object
 	req := &capturespb.CaptureRequest{
-		Duration:  4,
+		Duration:  2,
 		Timestamp: timestamppb.Now(),
+		Filter: &capturespb.Filters{
+			Ips:       []string{"157.58.214.96", "10.16.84.36"},
+			Protocols: []string{"TCP"},
+			Ports:     []string{"49422"},
+			Macs:      []string{},
+		},
 	}
 
+	// Send request
 	resStream, err := c.StartCapture(context.Background(), req)
 	if err != nil {
 		log.Fatalf("error while calling StartCapture RPC (from IP: %s): %v", ip, err)

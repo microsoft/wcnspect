@@ -9,6 +9,7 @@ import (
 	"net"
 	"os/exec"
 	"strconv"
+	"strings"
 	"time"
 
 	"winspect/capturespb"
@@ -18,15 +19,69 @@ import (
 	"google.golang.org/protobuf/types/known/timestamppb"
 )
 
+var pktParams = map[string]string{
+	"protocols": "-t",
+	"ips":       "-i",
+	"ports":     "-p",
+	"macs":      "-m",
+}
+
 type server struct {
 	capturespb.UnimplementedCaptureServiceServer
 }
 
+func pktmonReset(clear_filters bool) error {
+	// Stop packet monitor
+	if err := exec.Command("cmd", "/c", "pktmon stop").Run(); err != nil {
+		log.Fatalf("Failed to stop pktmon when reseting: %v", err)
+	}
+
+	// Optionally clear filters
+	if clear_filters {
+		if err := exec.Command("cmd", "/c", "pktmon filter remove").Run(); err != nil {
+			log.Fatalf("Failed to remove old filters: %v", err)
+		}
+	}
+
+	return nil
+}
+
 func (*server) StartCapture(req *capturespb.CaptureRequest, stream capturespb.CaptureService_StartCaptureServer) error {
 	fmt.Printf("StartCapture function was invoked with %v\n", req)
-	dur := req.GetDuration()
 
-	// ensure pktmon isn't running, then execute command and check for errors
+	// Retrieve and format request arguments
+	dur := req.GetDuration()
+	filter := req.GetFilter()
+	args := map[string][]string{
+		"protocols": filter.GetProtocols(),
+		"ips":       filter.GetIps(),
+		"ports":     filter.GetPorts(),
+		"macs":      filter.GetMacs(),
+	}
+
+	if len(args["protocols"]) == 0 {
+		args["protocols"] = append(args["protocols"], "")
+	}
+
+	// Ensure filters are reset and add new ones
+	pktmonReset(true)
+	for _, protocol := range args["protocols"] {
+		name := " winspect" + protocol + " "
+		filters := []string{}
+
+		for arg, addrs := range args {
+			// Short circuiting conditional for adding protocol(s) if in filter request
+			if len(addrs) > 0 && len(addrs[0]) > 0 {
+				filters = append(filters, pktParams[arg]+" "+strings.Join(addrs, " "))
+			}
+		}
+
+		if err := exec.Command("cmd", "/c", "pktmon filter add"+name+strings.Join(filters, " ")).Run(); err != nil {
+			log.Fatalf("Failed to add%sfilter: %v", name, err)
+		}
+	}
+
+	// Execute pktmon command and check for errors
 	exec.Command("cmd", "/c", "pktmon stop").Run()
 	cmd := exec.Command("cmd", "/c", "pktmon start -c -m real-time")
 	stdout, err := cmd.StdoutPipe()
@@ -38,12 +93,12 @@ func (*server) StartCapture(req *capturespb.CaptureRequest, stream capturespb.Ca
 		log.Fatal(err)
 	}
 
-	// scanning loop with timeout constraint
+	// Scanning loop with timeout constraint
 	var i int
 	scanner := bufio.NewScanner(stdout)
 	scanner.Split(bufio.ScanLines)
 	for start := time.Now(); scanner.Scan(); {
-		// only check timeout every 10 iterations
+		// Only check timeout every 10 iterations
 		if i%10 == 0 {
 			// if dur < 0, run until client sends StopCapture
 			if dur > 0 && time.Since(start) > time.Second*time.Duration(dur) {
@@ -51,28 +106,28 @@ func (*server) StartCapture(req *capturespb.CaptureRequest, stream capturespb.Ca
 			}
 		}
 
-		// loop main body
+		// Loop main body
 		m := scanner.Text()
+
 		res := &capturespb.CaptureResponse{
 			Result:    m,
 			Timestamp: timestamppb.Now(),
 		}
+
 		stream.Send(res)
 		log.Printf("Sent: \n%v", res)
 		i++
 	}
 
 	// Stop pktmon if still running
-	if err := exec.Command("cmd", "/c", "pktmon stop").Run(); err != nil {
-		log.Printf("failed to stop pktmon at end of stream: %v", err)
-	}
+	pktmonReset(true)
 
 	return nil
 }
 
 func (*server) StopCapture(ctx context.Context, req *capturespb.Empty) (*capturespb.Empty, error) {
 	if err := exec.Command("cmd", "/c", "pktmon stop").Run(); err != nil {
-		log.Printf("failed to stop pktmon: %v", err)
+		log.Printf("Failed to stop pktmon: %v", err)
 	}
 
 	return req, nil
@@ -93,7 +148,7 @@ func main() {
 
 	listener, err := net.Listen("tcp", "0.0.0.0:"+port)
 	if err != nil {
-		log.Fatalf("failed to listen: %v", err)
+		log.Fatalf("Failed to listen: %v", err)
 	}
 	fmt.Print("Server started")
 	s := grpc.NewServer()
@@ -103,6 +158,6 @@ func main() {
 	reflection.Register(s)
 
 	if err := s.Serve(listener); err != nil {
-		log.Fatalf("failed to serve: %v", err)
+		log.Fatalf("Failed to serve: %v", err)
 	}
 }
