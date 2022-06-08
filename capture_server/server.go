@@ -3,6 +3,7 @@ package main
 import (
 	"bufio"
 	"context"
+	"encoding/json"
 	"flag"
 	"fmt"
 	"log"
@@ -17,6 +18,8 @@ import (
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/reflection"
 	"google.golang.org/protobuf/types/known/timestamppb"
+
+	"github.com/Microsoft/hcsshim/hcn"
 )
 
 var pktParams = map[string]string{
@@ -133,12 +136,54 @@ func (*server) StopCapture(ctx context.Context, req *capturespb.Empty) (*capture
 	return req, nil
 }
 
+func (*server) GetHCNLogs(ctx context.Context, req *capturespb.HCNRequest) (*capturespb.HCNResponse, error) {
+	// id := request.Id
+	// fmt.Printf("User ID is: %d", id)
+
+	// response := &UserResponse{
+	// 	Name: "John Doe",
+	// }
+	// return response, nil
+	hcntype := req.GetType()
+	obj := []byte{}
+	var lerr, jerr error
+
+	switch hcntype {
+	case "networks":
+		var networks []hcn.HostComputeNetwork
+		networks, lerr = hcn.ListNetworks()
+		obj, jerr = json.Marshal(networks)
+	case "endpoints":
+		var endpoints []hcn.HostComputeEndpoint
+		endpoints, lerr = hcn.ListEndpoints()
+		obj, jerr = json.Marshal(endpoints)
+	case "loadbalancers":
+		var lbs []hcn.HostComputeLoadBalancer
+		lbs, lerr = hcn.ListLoadBalancers()
+		obj, jerr = json.Marshal(lbs)
+	}
+
+	if lerr != nil {
+		log.Fatal(lerr)
+	}
+
+	if jerr != nil {
+		log.Fatal(jerr)
+	}
+
+	res := &capturespb.HCNResponse{
+		HcnResult: obj,
+	}
+
+	return res, nil
+}
+
 func main() {
 	// User variables declaration
 	var port string
 
 	// Flags declaration
-	flag.StringVar(&port, "p", "50051", "Specify port for server to listen on. Default is 50051.")
+	flag.StringVar(&port, "p", "50051", "Specify port for server to listen on.")
 	flag.Parse()
 
 	// Input validation

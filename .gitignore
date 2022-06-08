@@ -1,6 +1,8 @@
 # save me from unstaging these, .gitignore
 capture_server.exe
 capture_client.exe
+server.exe
+client.exe
 Pktmon.etl
 
 

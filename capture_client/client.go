@@ -16,11 +16,11 @@ import (
 func main() {
 	var wg sync.WaitGroup
 	var ips = []string{
-		"localhost:50051",
+		//"localhost:50051",
 		//"10.216.116.143:50051", // corresponding to t-nikoVM1
 		//"10.216.119.237:50051", // corresponding to t-nikoVM2
-		//"10.224.0.35:50051", // corresponding to internal aks windows node
-		//"10.224.0.67:50051", // corresponding to internal aks subnet myVM2
+		"10.224.0.35:50051", // corresponding to internal aks windows node
+		"10.224.0.67:50051", // corresponding to internal aks subnet myVM2
 	}
 
 	for _, ip := range ips {
@@ -47,7 +47,8 @@ func createConnection(ip string, wg *sync.WaitGroup) {
 
 	c := capturespb.NewCaptureServiceClient(cc)
 
-	doServerStreaming(c, ip)
+	pullHCNLogs(c, ip)
+	//doServerStreaming(c, ip)
 }
 
 func doServerStreaming(c capturespb.CaptureServiceClient, ip string) {
@@ -84,4 +85,22 @@ func doServerStreaming(c capturespb.CaptureServiceClient, ip string) {
 
 		fmt.Printf("Response from StartCapture (%s) sent at %s: \n%v\n", ip, msg.GetTimestamp().AsTime(), msg.GetResult())
 	}
+}
+
+func pullHCNLogs(c capturespb.CaptureServiceClient, ip string) {
+	fmt.Printf("Requesting HCN logs (from IP: %s)...\n", ip)
+	hcntype := "networks"
+
+	// Create request object
+	req := &capturespb.HCNRequest{
+		Type: hcntype,
+	}
+
+	// Send request
+	res, err := c.GetHCNLogs(context.Background(), req)
+	if err != nil {
+		log.Fatalf("error while calling GetHCNLogs RPC (from IP: %s): %v", ip, err)
+	}
+
+	fmt.Printf("Received logs for %s (from IP: %s): \n%s\n", hcntype, ip, string(res.GetHcnResult()))
 }
