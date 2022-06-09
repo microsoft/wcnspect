@@ -4,7 +4,6 @@ import (
 	"bufio"
 	"context"
 	"encoding/json"
-	"flag"
 	"fmt"
 	"log"
 	"net"
@@ -15,11 +14,13 @@ import (
 
 	"winspect/capturespb"
 
+	"github.com/Microsoft/hcsshim/hcn"
+
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/reflection"
 	"google.golang.org/protobuf/types/known/timestamppb"
 
-	"github.com/Microsoft/hcsshim/hcn"
+	flag "github.com/spf13/pflag"
 )
 
 var pktParams = map[string]string{
@@ -72,6 +73,7 @@ func (*server) StartCapture(req *capturespb.CaptureRequest, stream capturespb.Ca
 		name := " winspect" + protocol + " "
 		filters := []string{}
 
+		// Build filter slice
 		for arg, addrs := range args {
 			// Short circuiting conditional for adding protocol(s) if in filter request
 			if len(addrs) > 0 && len(addrs[0]) > 0 {
@@ -79,6 +81,12 @@ func (*server) StartCapture(req *capturespb.CaptureRequest, stream capturespb.Ca
 			}
 		}
 
+		// If there are no filters, break
+		if len(filters) == 0 {
+			break
+		}
+
+		// Execute filter command
 		if err := exec.Command("cmd", "/c", "pktmon filter add"+name+strings.Join(filters, " ")).Run(); err != nil {
 			log.Fatalf("Failed to add%sfilter: %v", name, err)
 		}
@@ -137,13 +145,6 @@ func (*server) StopCapture(ctx context.Context, req *capturespb.Empty) (*capture
 }
 
 func (*server) GetHCNLogs(ctx context.Context, req *capturespb.HCNRequest) (*capturespb.HCNResponse, error) {
-	// id := request.Id
-	// fmt.Printf("User ID is: %d", id)
-
-	// response := &UserResponse{
-	// 	Name: "John Doe",
-	// }
-	// return response, nil
 	hcntype := req.GetType()
 	obj := []byte{}
 	var lerr, jerr error
@@ -179,11 +180,11 @@ func (*server) GetHCNLogs(ctx context.Context, req *capturespb.HCNRequest) (*cap
 }
 
 func main() {
-	// User variables declaration
+	// User input variables
 	var port string
 
-	// Flags declaration
-	flag.StringVar(&port, "p", "50051", "Specify port for server to listen on.")
+	// Flags
+	flag.StringVarP(&port, "port", "p", "50051", "Specify port for server to listen on.")
 	flag.Parse()
 
 	// Input validation
