@@ -17,7 +17,35 @@ import (
 	flag "github.com/spf13/pflag"
 )
 
-var VALID_HCN_LOGS string = "loadbalancers endpoints networks"
+var validCommands = []string{"capture", "hns", "help"}
+var validHCNLogs = []string{"loadbalancers", "endpoints", "networks"}
+
+const winspectHelpString string = `winspect <command> [OPTIONS | help]
+    Advanced distributed packet capture and HNS log collection.
+
+Commands
+    capture    Start packet capture on given nodes and stream to client.
+    hns        Retrieve HNS logs from given nodes.
+
+    help       Show help text for specific command.
+               Example: winspect capture help
+
+    --help     Show help for available flags.
+
+`
+const captureHelpString string = `winspect capture <command>
+
+Commands
+    --help    Show help for available flags.
+`
+const hnsHelpString string = `winspect hns <command> [OPTIONS]
+
+Commands
+    loadbalancers    Retrieve logs for loadbalancers on each node.
+    endpoints        Retrieve logs for endpoints on each node.
+    networks         Retrieve logs for networks on each node.
+
+`
 
 type params struct {
 	cmd       string
@@ -30,13 +58,22 @@ type params struct {
 	time      int32
 }
 
+func contains(s []string, el string) bool {
+	for _, value := range s {
+		if value == el {
+			return true
+		}
+	}
+	return false
+}
+
 func main() {
 	// User input variables
 	var nodes, ips, protocols, ports, macs string //TODO: nodes required --can just check value then log fatal if invalid
 	var time int32
 
 	// Flags
-	flag.Int32VarP(&time, "time", "d", 0, "Time to run packet capture for in seconds. Runs indefinitely given 0.")
+	flag.Int32VarP(&time, "time", "d", 0, "Time to run packet capture for (in seconds). Runs indefinitely given 0.")
 	flag.StringVarP(&nodes, "nodes", "n", "", "Specify which nodes winspect should send requests to using node IPs. This field is required.")
 	flag.StringVarP(&ips, "ips", "i", "", "Match source or destination IP address. CIDR supported.")
 	flag.StringVarP(&protocols, "protocols", "t", "", "Match by transport protocol (TCP, UDP, ICMP).")
@@ -45,14 +82,39 @@ func main() {
 	flag.Parse()
 
 	// Some error handling for input
+	if len(os.Args) <= 1 {
+		fmt.Println(winspectHelpString)
+		return
+	}
+
 	cmd := os.Args[1]
-	if (cmd != "capture" && cmd != "hns") || (cmd == "hns" && !strings.Contains(VALID_HCN_LOGS, os.Args[2])) {
-		fmt.Println("Invalid command.")
+	if !contains(validCommands, cmd) {
+		fmt.Printf("Unknown command '%s'. See winspect help.\n", cmd)
+		return
+	}
+
+	if cmd == "help" {
+		fmt.Println(winspectHelpString)
+		return
+	}
+
+	if cmd == "hns" && len(os.Args) <= 1 && !contains(validHCNLogs, os.Args[2]) {
+		fmt.Printf("Unknown command '%s'. See winspect hcn help.\n", os.Args[2])
+		return
+	}
+
+	if len(os.Args) >= 3 && os.Args[2] == "help" {
+		switch cmd {
+		case "capture":
+			fmt.Println(captureHelpString)
+		case "hns":
+			fmt.Println(hnsHelpString)
+		}
 		return
 	}
 
 	if len(nodes) == 0 {
-		fmt.Println("Must pass at least one ip to the nodes flag.")
+		fmt.Println("Must pass at least one IP to the --nodes flag.")
 		return
 	}
 
