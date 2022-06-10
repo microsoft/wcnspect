@@ -227,6 +227,8 @@ func runCaptureStream(c capturespb.CaptureServiceClient, args *params, ip string
 
 		fmt.Printf("Response from StartCapture (%s) sent at %s: \n%v\n", ip, msg.GetTimestamp().AsTime(), msg.GetResult())
 	}
+
+	fmt.Printf("Finished receiving stream from IP: %s.\n", ip)
 }
 
 func runStopCapture(c capturespb.CaptureServiceClient, ip string) {

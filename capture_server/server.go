@@ -35,13 +35,15 @@ var pktParams = map[string]string{
 
 type server struct {
 	capturespb.UnimplementedCaptureServiceServer
+	currMonitor      *exec.Cmd          // Tracks the running pktmon stream
+	pktContextCancel context.CancelFunc // Tracks the pktmon stream's context's cancel func
 }
 
 func pktmonReset(clear_filters bool) error {
-	// Stop packet monitor if running
-	if err := exec.Command("cmd", "/c", "pktmon stop").Run(); err != nil {
-		log.Fatalf("Failed to stop pktmon when reseting: %v", err)
-	}
+	// // Stop packet monitor if running
+	// if err := exec.Command("cmd", "/c", "pktmon stop").Run(); err != nil {
+	// 	log.Fatalf("Failed to stop pktmon when reseting: %v", err)
+	// }
 
 	// Optionally clear filters
 	if clear_filters {
@@ -68,7 +70,7 @@ func pktmonStream(stdout *io.ReadCloser) <-chan string {
 	return c
 }
 
-func (*server) StartCapture(req *capturespb.CaptureRequest, stream capturespb.CaptureService_StartCaptureServer) error {
+func (s *server) StartCapture(req *capturespb.CaptureRequest, stream capturespb.CaptureService_StartCaptureServer) error {
 	fmt.Printf("StartCapture function was invoked with %v\n", req)
 
 	// Retrieve and format request arguments
@@ -117,21 +119,22 @@ func (*server) StartCapture(req *capturespb.CaptureRequest, stream capturespb.Ca
 		}
 	}
 
-	// Create a timeout context
+	// Create a timeout context and set as server's pktmon canceller
 	ctx, cancel := context.WithTimeout(context.Background(), time.Duration(dur)*time.Second)
+	s.pktContextCancel = cancel
 	defer cancel()
 
-	// Execute pktmon command and check for errors
+	// Execute pktmon command and check for errors, if successful, set as server's currMonitor
 	exec.Command("cmd", "/c", "pktmon stop").Run()
 	cmd := exec.CommandContext(ctx, "cmd", "/c", "pktmon start -c -m real-time")
 	stdout, err := cmd.StdoutPipe()
-
 	if err != nil {
 		log.Fatal(err)
 	}
 	if err := cmd.Start(); err != nil {
 		log.Fatal(err)
 	}
+	s.currMonitor = cmd
 
 	// Create a channel to receive pktmon stream from
 	c := pktmonStream(&stdout)
@@ -159,15 +162,21 @@ func (*server) StartCapture(req *capturespb.CaptureRequest, stream capturespb.Ca
 	}()
 	wg.Wait()
 
-	// Reset pktmon filters
+	// Reset pktmon filters, server's currMonitor, and server's pktContextCancel
 	pktmonReset(true)
+	s.currMonitor = nil
+	s.pktContextCancel = nil
 	log.Printf("Packet monitor filters reset.")
 
 	return nil
 }
 
-func (*server) StopCapture(ctx context.Context, req *capturespb.Empty) (*capturespb.Empty, error) {
-	pktmonReset(true)
+func (s *server) StopCapture(ctx context.Context, req *capturespb.Empty) (*capturespb.Empty, error) {
+	if s.currMonitor != nil {
+		s.currMonitor.Process.Kill()
+		s.pktContextCancel()
+		log.Printf("Successfully killed packet capture stream.\n")
+	}
 
 	return req, nil
 }
