@@ -192,6 +192,8 @@ func createConnectionAndRoute(ip string, args *params, wg *sync.WaitGroup) {
 }
 
 func runCaptureStream(c capturespb.CaptureServiceClient, args *params, ip string) {
+	// Capture any sigint to send a StopCapture request
+
 	fmt.Printf("Starting to do a Server Streaming RPC (from IP: %s)...\n", ip)
 
 	// Create request object

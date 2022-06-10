@@ -5,11 +5,14 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"io"
 	"log"
+	"math"
 	"net"
 	"os/exec"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	"winspect/capturespb"
@@ -35,7 +38,7 @@ type server struct {
 }
 
 func pktmonReset(clear_filters bool) error {
-	// Stop packet monitor
+	// Stop packet monitor if running
 	if err := exec.Command("cmd", "/c", "pktmon stop").Run(); err != nil {
 		log.Fatalf("Failed to stop pktmon when reseting: %v", err)
 	}
@@ -48,6 +51,21 @@ func pktmonReset(clear_filters bool) error {
 	}
 
 	return nil
+}
+
+func pktmonStream(stdout *io.ReadCloser) <-chan string {
+	c := make(chan string)
+
+	scanner := bufio.NewScanner(*stdout)
+	scanner.Split(bufio.ScanLines)
+	go func(s *bufio.Scanner) {
+		s.Split(bufio.ScanLines)
+		for s.Scan() {
+			c <- s.Text()
+		}
+	}(scanner)
+
+	return c
 }
 
 func (*server) StartCapture(req *capturespb.CaptureRequest, stream capturespb.CaptureService_StartCaptureServer) error {
@@ -63,8 +81,14 @@ func (*server) StartCapture(req *capturespb.CaptureRequest, stream capturespb.Ca
 		"macs":      filter.GetMacs(),
 	}
 
+	// Add an empty protocol since our filtering mechanism depends on there being one
 	if len(args["protocols"]) == 0 {
 		args["protocols"] = append(args["protocols"], "")
+	}
+
+	// If duration is less than 0, we run for an "infinite" amount of time
+	if dur <= 0 {
+		dur = math.MaxInt32
 	}
 
 	// Ensure filters are reset and add new ones
@@ -87,14 +111,19 @@ func (*server) StartCapture(req *capturespb.CaptureRequest, stream capturespb.Ca
 		}
 
 		// Execute filter command
+		fmt.Println("Applying filters...")
 		if err := exec.Command("cmd", "/c", "pktmon filter add"+name+strings.Join(filters, " ")).Run(); err != nil {
 			log.Fatalf("Failed to add%sfilter: %v", name, err)
 		}
 	}
 
+	// Create a timeout context
+	ctx, cancel := context.WithTimeout(context.Background(), time.Duration(dur)*time.Second)
+	defer cancel()
+
 	// Execute pktmon command and check for errors
 	exec.Command("cmd", "/c", "pktmon stop").Run()
-	cmd := exec.Command("cmd", "/c", "pktmon start -c -m real-time")
+	cmd := exec.CommandContext(ctx, "cmd", "/c", "pktmon start -c -m real-time")
 	stdout, err := cmd.StdoutPipe()
 
 	if err != nil {
@@ -104,42 +133,41 @@ func (*server) StartCapture(req *capturespb.CaptureRequest, stream capturespb.Ca
 		log.Fatal(err)
 	}
 
-	// Scanning loop with timeout constraint
-	var i int
-	scanner := bufio.NewScanner(stdout)
-	scanner.Split(bufio.ScanLines)
-	for start := time.Now(); scanner.Scan(); {
-		// Only check timeout every 10 iterations
-		if i%10 == 0 {
-			// if dur < 0, run until client sends StopCapture
-			if dur > 0 && time.Since(start) > time.Second*time.Duration(dur) {
-				break
+	// Create a channel to receive pktmon stream from
+	c := pktmonStream(&stdout)
+
+	// Goroutine with a timeout constraint and pulling on pktmon channel with scanning loop
+	var wg sync.WaitGroup
+	wg.Add(1)
+	go func() {
+		for {
+			select {
+			case out := <-c:
+				res := &capturespb.CaptureResponse{
+					Result:    out,
+					Timestamp: timestamppb.Now(),
+				}
+
+				stream.Send(res)
+				log.Printf("Sent: \n%v", res)
+			case <-ctx.Done():
+				log.Printf("Stream finished.")
+				wg.Done()
+				return
 			}
 		}
+	}()
+	wg.Wait()
 
-		// Loop main body
-		m := scanner.Text()
-
-		res := &capturespb.CaptureResponse{
-			Result:    m,
-			Timestamp: timestamppb.Now(),
-		}
-
-		stream.Send(res)
-		log.Printf("Sent: \n%v", res)
-		i++
-	}
-
-	// Stop pktmon if still running
+	// Reset pktmon filters
 	pktmonReset(true)
+	log.Printf("Packet monitor filters reset.")
 
 	return nil
 }
 
 func (*server) StopCapture(ctx context.Context, req *capturespb.Empty) (*capturespb.Empty, error) {
-	if err := exec.Command("cmd", "/c", "pktmon stop").Run(); err != nil {
-		log.Printf("Failed to stop pktmon: %v", err)
-	}
+	pktmonReset(true)
 
 	return req, nil
 }
