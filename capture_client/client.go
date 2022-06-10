@@ -6,8 +6,10 @@ import (
 	"io"
 	"log"
 	"os"
+	"os/signal"
 	"strings"
 	"sync"
+	"syscall"
 
 	"winspect/capturespb"
 
@@ -65,6 +67,20 @@ func contains(s []string, el string) bool {
 		}
 	}
 	return false
+}
+
+func cleanup(nodes []string) {
+	var wg sync.WaitGroup
+	for _, ip := range nodes {
+		// Increment the WaitGroup counter
+		wg.Add(1)
+
+		// Launch a goroutine to run the capture
+		go createConnectionAndRoute(ip, &params{cmd: "stop"}, &wg)
+	}
+
+	// Wait for all captures to complete
+	wg.Wait()
 }
 
 func main() {
@@ -130,6 +146,15 @@ func main() {
 		time:      time,
 	}
 
+	// Capture any sigint to send a StopCapture request
+	c := make(chan os.Signal)
+	signal.Notify(c, os.Interrupt, syscall.SIGINT, syscall.SIGTERM)
+	go func() {
+		<-c
+		cleanup(args.nodes)
+		os.Exit(1)
+	}()
+
 	// Create waitgroup to maintain each connection
 	var wg sync.WaitGroup
 	for _, ip := range args.nodes {
@@ -161,6 +186,8 @@ func createConnectionAndRoute(ip string, args *params, wg *sync.WaitGroup) {
 		runCaptureStream(c, args, ip)
 	case "hns":
 		printHCNLogs(c, args, ip)
+	case "stop":
+		runStopCapture(c, ip)
 	}
 }
 
@@ -206,7 +233,7 @@ func runStopCapture(c capturespb.CaptureServiceClient, ip string) {
 		log.Fatalf("error while calling StopCapture RPC (from IP: %s): %v", ip, err)
 	}
 
-	fmt.Printf("Stopped capture on IP: %s.", ip)
+	fmt.Printf("Ended packet capture on IP: %s.\n", ip)
 }
 
 func printHCNLogs(c capturespb.CaptureServiceClient, args *params, ip string) {
