@@ -39,14 +39,16 @@ type server struct {
 	pktContextCancel context.CancelFunc // Tracks the pktmon stream's context's cancel func
 }
 
-func pktmonReset(clear_filters bool) error {
-	// // Stop packet monitor if running
-	// if err := exec.Command("cmd", "/c", "pktmon stop").Run(); err != nil {
-	// 	log.Fatalf("Failed to stop pktmon when reseting: %v", err)
-	// }
+func resetPktmon(captures bool, filters bool) error {
+	// Stop pktmon
+	if captures {
+		if err := exec.Command("cmd", "/c", "pktmon stop").Run(); err != nil {
+			log.Fatalf("Failed to stop pktmon: %v", err)
+		}
+	}
 
-	// Optionally clear filters
-	if clear_filters {
+	// Clear filters
+	if filters {
 		if err := exec.Command("cmd", "/c", "pktmon filter remove").Run(); err != nil {
 			log.Fatalf("Failed to remove old filters: %v", err)
 		}
@@ -94,7 +96,7 @@ func (s *server) StartCapture(req *capturespb.CaptureRequest, stream capturespb.
 	}
 
 	// Ensure filters are reset and add new ones
-	pktmonReset(true)
+	resetPktmon(true, true)
 	for _, protocol := range args["protocols"] {
 		name := " winspect" + protocol + " "
 		filters := []string{}
@@ -163,7 +165,7 @@ func (s *server) StartCapture(req *capturespb.CaptureRequest, stream capturespb.
 	wg.Wait()
 
 	// Reset pktmon filters, server's currMonitor, and server's pktContextCancel
-	pktmonReset(true)
+	resetPktmon(false, true)
 	s.currMonitor = nil
 	s.pktContextCancel = nil
 	log.Printf("Packet monitor filters reset.")
