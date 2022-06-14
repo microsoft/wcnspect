@@ -7,7 +7,6 @@ import (
 	"log"
 	"os"
 	"os/signal"
-	"strings"
 	"sync"
 	"syscall"
 
@@ -60,15 +59,6 @@ type params struct {
 	time      int32
 }
 
-func contains(s []string, el string) bool {
-	for _, value := range s {
-		if value == el {
-			return true
-		}
-	}
-	return false
-}
-
 func cleanup(nodes []string) {
 	var wg sync.WaitGroup
 	for _, ip := range nodes {
@@ -85,7 +75,7 @@ func cleanup(nodes []string) {
 
 func main() {
 	// User input variables
-	var nodes, ips, protocols, ports, macs string //TODO: nodes required --can just check value then log fatal if invalid
+	var nodes, ips, protocols, ports, macs string
 	var time int32
 
 	// Flags
@@ -97,7 +87,7 @@ func main() {
 	flag.StringVarP(&macs, "macs", "m", "", "Match source or destination MAC address.")
 	flag.Parse()
 
-	// Some error handling for input
+	// Some temporary hardcoded error handling for input
 	if len(os.Args) <= 1 {
 		fmt.Println(winspectHelpString)
 		return
@@ -138,12 +128,12 @@ func main() {
 	args := params{
 		cmd:       cmd,
 		subcmd:    os.Args[2],
-		nodes:     strings.Split(nodes, ","),
-		ips:       strings.Split(ips, ","),
-		protocols: strings.Split(protocols, ","),
-		ports:     strings.Split(ports, ","),
-		macs:      strings.Split(macs, ","),
-		time:      time,
+		nodes:     parseValidateNodes(nodes),
+		ips:       parseValidateIPAddrs(ips),
+		protocols: parseValidateProts(protocols),
+		ports:     parseValidatePorts(ports),
+		macs:      parseValidateMACAddrs(macs),
+		time:      validateTime(time),
 	}
 
 	// Capture any sigint to send a StopCapture request

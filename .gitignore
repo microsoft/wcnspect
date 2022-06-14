@@ -1,8 +1,6 @@
-# save me from unstaging these, .gitignore
-capture_server.exe
-capture_client.exe
-server.exe
-client.exe
+# Ignore client and server executables
+winspect.exe
+winspectserv.exe
 Pktmon.etl
 
 
