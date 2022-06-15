@@ -15,15 +15,13 @@ import (
 	"sync"
 	"time"
 
-	"winspect/capturespb"
-
 	"github.com/Microsoft/hcsshim/hcn"
+	pb "github.com/microsoft/winspect/rpc"
 
+	flag "github.com/spf13/pflag"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/reflection"
 	"google.golang.org/protobuf/types/known/timestamppb"
-
-	flag "github.com/spf13/pflag"
 )
 
 var pktParams = map[string]string{
@@ -33,10 +31,14 @@ var pktParams = map[string]string{
 	"macs":      "-m",
 }
 
-type server struct {
-	capturespb.UnimplementedCaptureServiceServer
+type captureServer struct {
+	pb.UnimplementedCaptureServiceServer
 	currMonitor      *exec.Cmd          // Tracks the running pktmon stream
 	pktContextCancel context.CancelFunc // Tracks the pktmon stream's context's cancel func
+}
+
+type hcnServer struct {
+	pb.UnimplementedHCNServiceServer
 }
 
 func resetPktmon(captures bool, filters bool) error {
@@ -72,7 +74,7 @@ func pktmonStream(stdout *io.ReadCloser) <-chan string {
 	return c
 }
 
-func (s *server) StartCapture(req *capturespb.CaptureRequest, stream capturespb.CaptureService_StartCaptureServer) error {
+func (s *captureServer) StartCapture(req *pb.CaptureRequest, stream pb.CaptureService_StartCaptureServer) error {
 	fmt.Printf("StartCapture function was invoked with %v\n", req)
 
 	// Retrieve and format request arguments
@@ -148,7 +150,7 @@ func (s *server) StartCapture(req *capturespb.CaptureRequest, stream capturespb.
 		for {
 			select {
 			case out := <-c:
-				res := &capturespb.CaptureResponse{
+				res := &pb.CaptureResponse{
 					Result:    out,
 					Timestamp: timestamppb.Now(),
 				}
@@ -173,7 +175,9 @@ func (s *server) StartCapture(req *capturespb.CaptureRequest, stream capturespb.
 	return nil
 }
 
-func (s *server) StopCapture(ctx context.Context, req *capturespb.Empty) (*capturespb.Empty, error) {
+func (s *captureServer) StopCapture(ctx context.Context, req *pb.Empty) (*pb.Empty, error) {
+	fmt.Println("StopCapture function was invoked.")
+
 	if s.currMonitor != nil {
 		s.currMonitor.Process.Kill()
 		s.pktContextCancel()
@@ -183,21 +187,23 @@ func (s *server) StopCapture(ctx context.Context, req *capturespb.Empty) (*captu
 	return req, nil
 }
 
-func (*server) GetHCNLogs(ctx context.Context, req *capturespb.HCNRequest) (*capturespb.HCNResponse, error) {
-	hcntype := req.GetType()
+func (*hcnServer) GetHCNLogs(ctx context.Context, req *pb.HCNRequest) (*pb.HCNResponse, error) {
+	hcntype := pb.HCNType(req.GetHcntype())
 	obj := []byte{}
 	var lerr, jerr error
 
+	fmt.Printf("GetHCNLogs function was invoked for %s.\n", hcntype)
+
 	switch hcntype {
-	case "networks":
+	case pb.HCNType_networks:
 		var networks []hcn.HostComputeNetwork
 		networks, lerr = hcn.ListNetworks()
 		obj, jerr = json.Marshal(networks)
-	case "endpoints":
+	case pb.HCNType_endpoints:
 		var endpoints []hcn.HostComputeEndpoint
 		endpoints, lerr = hcn.ListEndpoints()
 		obj, jerr = json.Marshal(endpoints)
-	case "loadbalancers":
+	case pb.HCNType_loadbalancers:
 		var lbs []hcn.HostComputeLoadBalancer
 		lbs, lerr = hcn.ListLoadBalancers()
 		obj, jerr = json.Marshal(lbs)
@@ -211,9 +217,11 @@ func (*server) GetHCNLogs(ctx context.Context, req *capturespb.HCNRequest) (*cap
 		log.Fatal(jerr)
 	}
 
-	res := &capturespb.HCNResponse{
+	res := &pb.HCNResponse{
 		HcnResult: obj,
 	}
+
+	log.Printf("Sending: \n%v", res)
 
 	return res, nil
 }
@@ -237,7 +245,8 @@ func main() {
 	}
 	fmt.Print("Server started")
 	s := grpc.NewServer()
-	capturespb.RegisterCaptureServiceServer(s, &server{})
+	pb.RegisterCaptureServiceServer(s, &captureServer{})
+	pb.RegisterHCNServiceServer(s, &hcnServer{})
 
 	// Register reflection service on gRPC server
 	reflection.Register(s)

@@ -1,0 +1,25 @@
+syntax = "proto3";
+option go_package = "github.com/microsoft/winspect/rpc";
+package winspect.hcn;
+
+
+enum HCNType {
+	loadbalancers = 0;
+	endpoints = 1;
+	networks = 2;
+}
+
+// requests
+message HCNRequest {
+	HCNType hcntype = 1;
+}
+
+// responses
+message HCNResponse {
+	bytes hcn_result = 1;
+}
+
+// service
+service HCNService {
+	rpc GetHCNLogs(HCNRequest) returns (HCNResponse) {}
+}

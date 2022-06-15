@@ -1,9 +1,9 @@
 syntax = "proto3";
+option go_package = "github.com/microsoft/winspect/rpc";
+package winspect.captures;
 
 import "google/protobuf/timestamp.proto";
 
-package captures;
-option go_package = "/capturespb";
 
 // models
 message Filters {
@@ -24,18 +24,10 @@ message CaptureRequest {
 	Filters filter = 3;
 }
 
-message HCNRequest {
-	string type = 1;
-}
-
 // responses
 message CaptureResponse {
 	string result = 1;
 	google.protobuf.Timestamp timestamp = 2;
-}
-
-message HCNResponse {
-	bytes hcn_result = 1;
 }
 
 // service
@@ -43,6 +35,4 @@ service CaptureService {
 	rpc StartCapture(CaptureRequest) returns (stream CaptureResponse) {}
 	
 	rpc StopCapture(Empty) returns (Empty) {}
-
-	rpc GetHCNLogs(HCNRequest) returns (HCNResponse) {}
 }

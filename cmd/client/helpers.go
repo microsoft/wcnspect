@@ -6,19 +6,12 @@ import (
 	"os"
 	"strconv"
 	"strings"
+
+	"github.com/microsoft/winspect/pkg/comprise"
 )
 
 var validProtocols = []string{"TCP", "UDP", "ICMP", "ICMPv6"}
 var vlog = log.New(os.Stderr, "", 0)
-
-func contains(s []string, el string) bool {
-	for _, value := range s {
-		if value == el {
-			return true
-		}
-	}
-	return false
-}
 
 func validateTime(time int32) int32 {
 	if time < 0 {
@@ -59,7 +52,7 @@ func parseValidateProts(protocols string) []string {
 
 	ls := strings.Split(protocols, ",")
 	for _, prot := range ls {
-		if !contains(validProtocols, prot) {
+		if !comprise.Contains(validProtocols, prot) {
 			vlog.Fatalf("Invalid protocol: %s", prot)
 		}
 	}

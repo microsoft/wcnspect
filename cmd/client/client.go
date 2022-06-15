@@ -10,16 +10,15 @@ import (
 	"sync"
 	"syscall"
 
-	"winspect/capturespb"
-
-	"google.golang.org/grpc"
-	"google.golang.org/protobuf/types/known/timestamppb"
+	"github.com/microsoft/winspect/pkg/comprise"
+	pb "github.com/microsoft/winspect/rpc"
 
 	flag "github.com/spf13/pflag"
+	"google.golang.org/grpc"
+	"google.golang.org/protobuf/types/known/timestamppb"
 )
 
 var validCommands = []string{"capture", "hns", "help"}
-var validHCNLogs = []string{"loadbalancers", "endpoints", "networks"}
 
 const winspectHelpString string = `winspect <command> [OPTIONS | help]
     Advanced distributed packet capture and HNS log collection.
@@ -59,6 +58,11 @@ type params struct {
 	time      int32
 }
 
+type client struct {
+	pb.CaptureServiceClient
+	pb.HCNServiceClient
+}
+
 func cleanup(nodes []string) {
 	var wg sync.WaitGroup
 	for _, ip := range nodes {
@@ -94,7 +98,7 @@ func main() {
 	}
 
 	cmd := os.Args[1]
-	if !contains(validCommands, cmd) {
+	if !comprise.Contains(validCommands, cmd) {
 		fmt.Printf("Unknown command '%s'. See winspect help.\n", cmd)
 		return
 	}
@@ -104,7 +108,7 @@ func main() {
 		return
 	}
 
-	if cmd == "hns" && len(os.Args) <= 1 && !contains(validHCNLogs, os.Args[2]) {
+	if cmd == "hns" && len(os.Args) <= 1 && !comprise.Contains(comprise.GetKeys(pb.HCNType_value), os.Args[2]) {
 		fmt.Printf("Unknown command '%s'. See winspect hcn help.\n", os.Args[2])
 		return
 	}
@@ -169,7 +173,9 @@ func createConnectionAndRoute(ip string, args *params, wg *sync.WaitGroup) {
 	}
 	defer cc.Close()
 
-	c := capturespb.NewCaptureServiceClient(cc)
+	c1 := pb.NewCaptureServiceClient(cc)
+	c2 := pb.NewHCNServiceClient(cc)
+	c := &client{c1, c2}
 
 	switch args.cmd {
 	case "capture":
@@ -181,16 +187,16 @@ func createConnectionAndRoute(ip string, args *params, wg *sync.WaitGroup) {
 	}
 }
 
-func runCaptureStream(c capturespb.CaptureServiceClient, args *params, ip string) {
+func runCaptureStream(c pb.CaptureServiceClient, args *params, ip string) {
 	// Capture any sigint to send a StopCapture request
 
 	fmt.Printf("Starting to do a Server Streaming RPC (from IP: %s)...\n", ip)
 
 	// Create request object
-	req := &capturespb.CaptureRequest{
+	req := &pb.CaptureRequest{
 		Duration:  args.time,
 		Timestamp: timestamppb.Now(),
-		Filter: &capturespb.Filters{
+		Filter: &pb.Filters{
 			Ips:       args.ips,
 			Protocols: args.protocols,
 			Ports:     args.ports,
@@ -221,8 +227,8 @@ func runCaptureStream(c capturespb.CaptureServiceClient, args *params, ip string
 	fmt.Printf("Finished receiving stream from IP: %s.\n", ip)
 }
 
-func runStopCapture(c capturespb.CaptureServiceClient, ip string) {
-	_, err := c.StopCapture(context.Background(), &capturespb.Empty{})
+func runStopCapture(c pb.CaptureServiceClient, ip string) {
+	_, err := c.StopCapture(context.Background(), &pb.Empty{})
 	if err != nil {
 		log.Fatalf("error while calling StopCapture RPC (from IP: %s): %v", ip, err)
 	}
@@ -230,13 +236,13 @@ func runStopCapture(c capturespb.CaptureServiceClient, ip string) {
 	fmt.Printf("Ended packet capture on IP: %s.\n", ip)
 }
 
-func printHCNLogs(c capturespb.CaptureServiceClient, args *params, ip string) {
+func printHCNLogs(c pb.HCNServiceClient, args *params, ip string) {
 	fmt.Printf("Requesting HCN logs (from IP: %s)...\n", ip)
 	hcntype := args.subcmd
 
 	// Create request object
-	req := &capturespb.HCNRequest{
-		Type: hcntype,
+	req := &pb.HCNRequest{
+		Hcntype: pb.HCNType(pb.HCNType_value[hcntype]),
 	}
 
 	// Send request
