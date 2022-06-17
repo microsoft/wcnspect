@@ -7,7 +7,11 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/microsoft/winspect/common"
 	"github.com/microsoft/winspect/pkg/comprise"
+	"github.com/microsoft/winspect/pkg/k8spi"
+
+	v1 "k8s.io/api/core/v1"
 )
 
 var validProtocols = []string{"TCP", "UDP", "ICMP", "ICMPv6"}
@@ -20,15 +24,25 @@ func validateTime(time int32) int32 {
 	return time
 }
 
-func parseValidateNodes(nodes string) []string {
-	// Filters out any argument that isn't in the following format "<ip>:<port>"
-	ls := strings.Split(nodes, ",")
-	for _, node := range ls {
-		if _, err := net.ResolveUDPAddr("udp", node); err != nil {
-			vlog.Fatalf("Invalid node address: %v", err)
+func parseValidateNodes(nodes string, nodeset []v1.Node) []string {
+	winNodes := k8spi.FilterNodes(nodeset, k8spi.WindowsOS)
+	winMap := k8spi.GetNodeMap(winNodes)
+	winNames, winIPs := comprise.Keys(winMap), comprise.Values(winMap)
+	addPort := func(s string) string { return s + ":" + common.DefaultServerPort }
+
+	if len(nodes) == 0 {
+		return comprise.Map(winIPs, addPort)
+	}
+
+	names := strings.Split(nodes, ",")
+	for _, node := range names {
+		if !comprise.Contains(winNames, node) {
+			vlog.Fatalf("Invalid windows node name: %s", node)
 		}
 	}
-	return ls
+
+	translateName := func(name string) string { return addPort(winMap[name]) }
+	return comprise.Map(names, translateName)
 }
 
 func parseValidateIPAddrs(ips string) []string {

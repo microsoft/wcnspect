@@ -15,8 +15,10 @@ import (
 	"sync"
 	"time"
 
-	"github.com/Microsoft/hcsshim/hcn"
+	"github.com/microsoft/winspect/common"
 	pb "github.com/microsoft/winspect/rpc"
+
+	"github.com/Microsoft/hcsshim/hcn"
 
 	flag "github.com/spf13/pflag"
 	"google.golang.org/grpc"
@@ -231,7 +233,7 @@ func main() {
 	var port string
 
 	// Flags
-	flag.StringVarP(&port, "port", "p", "50051", "Specify port for server to listen on.")
+	flag.StringVarP(&port, "port", "p", common.DefaultServerPort, "Specify port for server to listen on.")
 	flag.Parse()
 
 	// Input validation

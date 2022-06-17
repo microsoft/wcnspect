@@ -1,5 +1,6 @@
 package comprise
 
+// Methods for string slices
 func Contains(s []string, el string) bool {
 	for _, value := range s {
 		if value == el {
@@ -9,8 +10,16 @@ func Contains(s []string, el string) bool {
 	return false
 }
 
-func GetKeys(m map[string]int32) []string {
-	keys := make([]string, len(m))
+func Map(ls []string, f func(string) string) (ret []string) {
+	for _, s := range ls {
+		ret = append(ret, f(s))
+	}
+	return
+}
+
+// Methods for maps
+func Keys[K comparable, V any](m map[K]V) []K {
+	keys := make([]K, len(m))
 
 	j := 0
 	for k := range m {
@@ -19,4 +28,16 @@ func GetKeys(m map[string]int32) []string {
 	}
 
 	return keys
+}
+
+func Values[K comparable, V any](m map[K]V) []V {
+	values := make([]V, len(m))
+
+	j := 0
+	for k := range m {
+		values[j] = m[k]
+		j++
+	}
+
+	return values
 }

@@ -7,6 +7,7 @@ import (
 	"log"
 	"os"
 	"os/signal"
+	"path/filepath"
 	"sync"
 	"syscall"
 
@@ -16,10 +17,15 @@ import (
 	flag "github.com/spf13/pflag"
 	"google.golang.org/grpc"
 	"google.golang.org/protobuf/types/known/timestamppb"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/client-go/kubernetes"
+	"k8s.io/client-go/tools/clientcmd"
+	"k8s.io/client-go/util/homedir"
 )
 
 var validCommands = []string{"capture", "hns", "help"}
 
+const namespace string = "default"
 const winspectHelpString string = `winspect <command> [OPTIONS | help]
     Advanced distributed packet capture and HNS log collection.
 
@@ -79,25 +85,48 @@ func cleanup(nodes []string) {
 
 func main() {
 	// User input variables
+	var kubeconfig *string
 	var nodes, ips, protocols, ports, macs string
 	var time int32
 
 	// Flags
+	if home := homedir.HomeDir(); home != "" {
+		kubeconfig = flag.String("kubeconfig", filepath.Join(home, ".kube", "config"), "(optional) absolute path to the kubeconfig file")
+	} else {
+		kubeconfig = flag.String("kubeconfig", "", "absolute path to the kubeconfig file")
+	}
 	flag.Int32VarP(&time, "time", "d", 0, "Time to run packet capture for (in seconds). Runs indefinitely given 0.")
-	flag.StringVarP(&nodes, "nodes", "n", "", "Specify which nodes winspect should send requests to using node IPs. This field is required.")
+	flag.StringVarP(&nodes, "nodes", "n", "", "Specify which nodes winspect should send requests to using node names. Runs on all windows nodes by default.")
 	flag.StringVarP(&ips, "ips", "i", "", "Match source or destination IP address. CIDR supported.")
 	flag.StringVarP(&protocols, "protocols", "t", "", "Match by transport protocol (TCP, UDP, ICMP).")
 	flag.StringVarP(&ports, "ports", "p", "", "Match source or destination port number.")
 	flag.StringVarP(&macs, "macs", "m", "", "Match source or destination MAC address.")
 	flag.Parse()
 
-	// Some temporary hardcoded error handling for input
+	// use the current context in kubeconfig
+	config, err := clientcmd.BuildConfigFromFlags("", *kubeconfig)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	// create the clientset
+	clientset, err := kubernetes.NewForConfig(config)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	// FIXME: Some temporary hardcoded error handling for input
 	if len(os.Args) <= 1 {
 		fmt.Println(winspectHelpString)
 		return
 	}
 
 	cmd := os.Args[1]
+	subcmd := ""
+	if len(os.Args) >= 3 {
+		subcmd = os.Args[2]
+	}
+
 	if !comprise.Contains(validCommands, cmd) {
 		fmt.Printf("Unknown command '%s'. See winspect help.\n", cmd)
 		return
@@ -108,12 +137,12 @@ func main() {
 		return
 	}
 
-	if cmd == "hns" && len(os.Args) <= 1 && !comprise.Contains(comprise.GetKeys(pb.HCNType_value), os.Args[2]) {
+	if cmd == "hns" && len(os.Args) <= 1 && !comprise.Contains(comprise.Keys(pb.HCNType_value), os.Args[2]) {
 		fmt.Printf("Unknown command '%s'. See winspect hcn help.\n", os.Args[2])
 		return
 	}
 
-	if len(os.Args) >= 3 && os.Args[2] == "help" {
+	if subcmd == "help" {
 		switch cmd {
 		case "capture":
 			fmt.Println(captureHelpString)
@@ -123,16 +152,25 @@ func main() {
 		return
 	}
 
-	if len(nodes) == 0 {
-		fmt.Println("Must pass at least one IP to the --nodes flag.")
-		return
+	// Pull nodes and pods
+	nodeset, err := clientset.CoreV1().Nodes().List(context.TODO(), metav1.ListOptions{})
+	if err != nil {
+		log.Fatal(err)
 	}
+
+	// pods, err := clientset.CoreV1().Pods(namespace).List(context.TODO(), metav1.ListOptions{})
+	// if err != nil {
+	// 	log.Fatal(err)
+	// }
+
+	// NEED: list of ips from nodes that have a windows os; map to translate between node name -> node ip;
+	//			map of pod name -> pod ip; map of pod name -> node ip
 
 	// Create params struct
 	args := params{
 		cmd:       cmd,
-		subcmd:    os.Args[2],
-		nodes:     parseValidateNodes(nodes),
+		subcmd:    subcmd,
+		nodes:     parseValidateNodes(nodes, nodeset.Items),
 		ips:       parseValidateIPAddrs(ips),
 		protocols: parseValidateProts(protocols),
 		ports:     parseValidatePorts(ports),
