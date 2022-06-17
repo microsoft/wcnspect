@@ -1,7 +1,8 @@
 # Project
 
 Currently, this project makes the following assumptions:
--The port that winspect server nodes use is 50051.
+
+* The port that winspect server nodes use is 50051.
 
 ## Contributing
 
