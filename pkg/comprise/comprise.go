@@ -34,8 +34,8 @@ func Values[K comparable, V any](m map[K]V) []V {
 	values := make([]V, len(m))
 
 	j := 0
-	for k := range m {
-		values[j] = m[k]
+	for _, v := range m {
+		values[j] = v
 		j++
 	}
 

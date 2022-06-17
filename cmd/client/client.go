@@ -23,8 +23,6 @@ import (
 	"k8s.io/client-go/util/homedir"
 )
 
-var validCommands = []string{"capture", "hns", "help"}
-
 const namespace string = "default"
 const winspectHelpString string = `winspect <command> [OPTIONS | help]
     Advanced distributed packet capture and HNS log collection.
@@ -36,20 +34,22 @@ Commands
     help       Show help text for specific command.
                Example: winspect capture help
 
-    --help     Show help for available flags.
-
 `
 const captureHelpString string = `winspect capture <command>
 
 Commands
     --help    Show help for available flags.
+
 `
 const hnsHelpString string = `winspect hns <command> [OPTIONS]
 
 Commands
-    loadbalancers    Retrieve logs for loadbalancers on each node.
-    endpoints        Retrieve logs for endpoints on each node.
-    networks         Retrieve logs for networks on each node.
+    loadbalancers    	Retrieve logs for loadbalancers on each node.
+    endpoints        	Retrieve logs for endpoints on each node.
+    networks         	Retrieve logs for networks on each node.
+
+Flags
+    -n, --nodes string	Specify which nodes winspect should send requests to using node names. Runs on all windows nodes by default.
 
 `
 
@@ -83,25 +83,86 @@ func cleanup(nodes []string) {
 	wg.Wait()
 }
 
-func main() {
-	// User input variables
-	var kubeconfig *string
-	var nodes, ips, protocols, ports, macs string
-	var time int32
+var (
+	// Shared flags
+	kubeconfig *string
+	nodes      string
 
-	// Flags
-	if home := homedir.HomeDir(); home != "" {
-		kubeconfig = flag.String("kubeconfig", filepath.Join(home, ".kube", "config"), "(optional) absolute path to the kubeconfig file")
-	} else {
-		kubeconfig = flag.String("kubeconfig", "", "absolute path to the kubeconfig file")
+	// Capture flags
+	ips, protocols, ports, macs string
+	time                        int32
+
+	// Commands
+	captureCmd = flag.NewFlagSet("capture", flag.ExitOnError)
+	hnsCmd     = flag.NewFlagSet("hns", flag.ExitOnError)
+	helpCmd    = flag.NewFlagSet("help", flag.ExitOnError)
+)
+
+var subcommands = map[string]*flag.FlagSet{
+	"capture": captureCmd,
+	"hns":     hnsCmd,
+	"help":    helpCmd,
+}
+
+func setupCommonFlags() {
+	for name, fs := range subcommands {
+		if name == "help" {
+			continue
+		}
+
+		if home := homedir.HomeDir(); home != "" {
+			kubeconfig = fs.String("kubeconfig", filepath.Join(home, ".kube", "config"), "(optional) absolute path to the kubeconfig file")
+		} else {
+			kubeconfig = fs.String("kubeconfig", "", "absolute path to the kubeconfig file")
+		}
+
+		fs.StringVarP(&nodes, "nodes", "n", "", "Specify which nodes winspect should send requests to using node names. Runs on all windows nodes by default.")
 	}
-	flag.Int32VarP(&time, "time", "d", 0, "Time to run packet capture for (in seconds). Runs indefinitely given 0.")
-	flag.StringVarP(&nodes, "nodes", "n", "", "Specify which nodes winspect should send requests to using node names. Runs on all windows nodes by default.")
-	flag.StringVarP(&ips, "ips", "i", "", "Match source or destination IP address. CIDR supported.")
-	flag.StringVarP(&protocols, "protocols", "t", "", "Match by transport protocol (TCP, UDP, ICMP).")
-	flag.StringVarP(&ports, "ports", "p", "", "Match source or destination port number.")
-	flag.StringVarP(&macs, "macs", "m", "", "Match source or destination MAC address.")
-	flag.Parse()
+}
+
+func setupCaptureFlags() {
+	captureCmd.Int32VarP(&time, "time", "d", 0, "Time to run packet capture for (in seconds). Runs indefinitely given 0.")
+	captureCmd.StringVarP(&ips, "ips", "i", "", "Match source or destination IP address. CIDR supported.")
+	captureCmd.StringVarP(&protocols, "protocols", "t", "", "Match by transport protocol (TCP, UDP, ICMP).")
+	captureCmd.StringVarP(&ports, "ports", "p", "", "Match source or destination port number.")
+	captureCmd.StringVarP(&macs, "macs", "m", "", "Match source or destination MAC address.")
+}
+
+func main() {
+	setupCommonFlags()
+	setupCaptureFlags()
+
+	if len(os.Args) < 2 {
+		vlog.Fatalf(winspectHelpString)
+	}
+
+	cmd := os.Args[1]
+	subcmd := ""
+	switch cmd {
+	case "capture":
+		if len(os.Args) > 2 {
+			subcommands[cmd].Parse(os.Args[2:])
+
+			if os.Args[2] == "help" {
+				vlog.Fatalf(captureHelpString)
+			}
+		}
+	case "hns":
+		if len(os.Args) < 3 || os.Args[2] == "help" {
+			vlog.Fatalf(hnsHelpString)
+		}
+
+		subcmd = os.Args[2]
+		subcommands[cmd].Parse(os.Args[2:])
+
+		if !comprise.Contains(comprise.Keys(pb.HCNType_value), subcmd) {
+			vlog.Fatalf("Unknown command '%s'. See winspect hns help.", subcmd)
+		}
+	case "help":
+		vlog.Fatalf(winspectHelpString)
+	default:
+		vlog.Fatalf("Unknown subcommand '%s', see winspect help for more details.", cmd)
+	}
 
 	// use the current context in kubeconfig
 	config, err := clientcmd.BuildConfigFromFlags("", *kubeconfig)
@@ -113,43 +174,6 @@ func main() {
 	clientset, err := kubernetes.NewForConfig(config)
 	if err != nil {
 		log.Fatal(err)
-	}
-
-	// FIXME: Some temporary hardcoded error handling for input
-	if len(os.Args) <= 1 {
-		fmt.Println(winspectHelpString)
-		return
-	}
-
-	cmd := os.Args[1]
-	subcmd := ""
-	if len(os.Args) >= 3 {
-		subcmd = os.Args[2]
-	}
-
-	if !comprise.Contains(validCommands, cmd) {
-		fmt.Printf("Unknown command '%s'. See winspect help.\n", cmd)
-		return
-	}
-
-	if cmd == "help" {
-		fmt.Println(winspectHelpString)
-		return
-	}
-
-	if cmd == "hns" && len(os.Args) <= 1 && !comprise.Contains(comprise.Keys(pb.HCNType_value), os.Args[2]) {
-		fmt.Printf("Unknown command '%s'. See winspect hcn help.\n", os.Args[2])
-		return
-	}
-
-	if subcmd == "help" {
-		switch cmd {
-		case "capture":
-			fmt.Println(captureHelpString)
-		case "hns":
-			fmt.Println(hnsHelpString)
-		}
-		return
 	}
 
 	// Pull nodes and pods
