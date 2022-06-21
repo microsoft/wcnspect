@@ -4,6 +4,7 @@ import (
 	v1 "k8s.io/api/core/v1"
 )
 
+// Node Methods
 func FilterNodes(nodes []v1.Node, test func(v1.Node) bool) (ret []v1.Node) {
 	for _, node := range nodes {
 		if test(node) {
@@ -44,4 +45,23 @@ func RetrieveInternalIP(node v1.Node) string {
 
 func WindowsOS(node v1.Node) bool {
 	return node.GetLabels()["kubernetes.io/os"] == "windows"
+}
+
+// Pod Methods
+func GetPodMaps(pods []v1.Pod) (map[string]string, map[string]string) {
+	ips := map[string]string{}
+	nodes := map[string]string{}
+	for _, pod := range pods {
+		ips[pod.GetName()] = pod.Status.PodIP
+		nodes[pod.GetName()] = pod.Status.HostIP
+	}
+
+	return ips, nodes
+}
+
+func MapPods(pods []v1.Pod, f func(v1.Pod) string) (ret []string) {
+	for _, pod := range pods {
+		ret = append(ret, f(pod))
+	}
+	return
 }

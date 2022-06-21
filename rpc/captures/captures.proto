@@ -7,10 +7,11 @@ import "google/protobuf/timestamp.proto";
 
 // models
 message Filters {
-	repeated string ips = 1;
-	repeated string protocols = 2;
-	repeated string ports = 3;
-	repeated string macs = 4;
+	repeated string pods = 1;
+	repeated string ips = 2;
+	repeated string protocols = 3;
+	repeated string ports = 4;
+	repeated string macs = 5;
 }
 
 message Empty {

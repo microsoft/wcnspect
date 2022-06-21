@@ -1,8 +1,8 @@
 package comprise
 
 // Methods for string slices
-func Contains(s []string, el string) bool {
-	for _, value := range s {
+func Contains(ls []string, el string) bool {
+	for _, value := range ls {
 		if value == el {
 			return true
 		}
@@ -11,8 +11,19 @@ func Contains(s []string, el string) bool {
 }
 
 func Map(ls []string, f func(string) string) (ret []string) {
-	for _, s := range ls {
-		ret = append(ret, f(s))
+	for _, value := range ls {
+		ret = append(ret, f(value))
+	}
+	return
+}
+
+func Unique(ls []string) (ret []string) {
+	keys := make(map[string]bool)
+	for _, value := range ls {
+		if _, dup := keys[value]; !dup {
+			keys[value] = true
+			ret = append(ret, value)
+		}
 	}
 	return
 }

@@ -7,7 +7,6 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/microsoft/winspect/common"
 	"github.com/microsoft/winspect/pkg/comprise"
 	"github.com/microsoft/winspect/pkg/k8spi"
 
@@ -28,10 +27,9 @@ func parseValidateNodes(nodes string, nodeset []v1.Node) []string {
 	winNodes := k8spi.FilterNodes(nodeset, k8spi.WindowsOS)
 	winMap := k8spi.GetNodeMap(winNodes)
 	winNames, winIPs := comprise.Keys(winMap), comprise.Values(winMap)
-	addPort := func(s string) string { return s + ":" + common.DefaultServerPort }
 
 	if len(nodes) == 0 {
-		return comprise.Map(winIPs, addPort)
+		return winIPs
 	}
 
 	names := strings.Split(nodes, ",")
@@ -41,13 +39,33 @@ func parseValidateNodes(nodes string, nodeset []v1.Node) []string {
 		}
 	}
 
-	translateName := func(name string) string { return addPort(winMap[name]) }
+	translateName := func(name string) string { return winMap[name] }
 	return comprise.Map(names, translateName)
+}
+
+func parseValidatePods(pods string, podset []v1.Pod) ([]string, []string) {
+	if len(pods) == 0 {
+		return []string{}, []string{}
+	}
+
+	podMapIP, podMapNodes := k8spi.GetPodMaps(podset)
+	podNames := comprise.Keys(podMapIP)
+
+	names := strings.Split(pods, ",")
+	for _, pod := range names {
+		if !comprise.Contains(podNames, pod) {
+			vlog.Fatalf("Invalid pod name: %s", pod)
+		}
+	}
+
+	translateForIP := func(name string) string { return podMapIP[name] }
+	translateForNode := func(name string) string { return podMapNodes[name] }
+	return comprise.Map(names, translateForIP), comprise.Unique(comprise.Map(names, translateForNode))
 }
 
 func parseValidateIPAddrs(ips string) []string {
 	if len(ips) == 0 {
-		return []string{""}
+		return []string{}
 	}
 
 	ls := strings.Split(ips, ",")
@@ -61,7 +79,7 @@ func parseValidateIPAddrs(ips string) []string {
 
 func parseValidateProts(protocols string) []string {
 	if len(protocols) == 0 {
-		return []string{""}
+		return []string{}
 	}
 
 	ls := strings.Split(protocols, ",")
@@ -75,7 +93,7 @@ func parseValidateProts(protocols string) []string {
 
 func parseValidatePorts(ports string) []string {
 	if len(ports) == 0 {
-		return []string{""}
+		return []string{}
 	}
 
 	ls := strings.Split(ports, ",")
@@ -90,7 +108,7 @@ func parseValidatePorts(ports string) []string {
 
 func parseValidateMACAddrs(macs string) []string {
 	if len(macs) == 0 {
-		return []string{""}
+		return []string{}
 	}
 
 	ls := strings.Split(macs, ",")

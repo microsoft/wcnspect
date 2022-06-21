@@ -11,6 +11,7 @@ import (
 	"sync"
 	"syscall"
 
+	"github.com/microsoft/winspect/common"
 	"github.com/microsoft/winspect/pkg/comprise"
 	pb "github.com/microsoft/winspect/rpc"
 
@@ -57,6 +58,7 @@ type params struct {
 	cmd       string
 	subcmd    string
 	nodes     []string
+	pods      []string
 	ips       []string
 	protocols []string
 	ports     []string
@@ -69,28 +71,14 @@ type client struct {
 	pb.HCNServiceClient
 }
 
-func cleanup(nodes []string) {
-	var wg sync.WaitGroup
-	for _, ip := range nodes {
-		// Increment the WaitGroup counter
-		wg.Add(1)
-
-		// Launch a goroutine to run the capture
-		go createConnectionAndRoute(ip, &params{cmd: "stop"}, &wg)
-	}
-
-	// Wait for all captures to complete
-	wg.Wait()
-}
-
 var (
 	// Shared flags
 	kubeconfig *string
 	nodes      string
 
 	// Capture flags
-	ips, protocols, ports, macs string
-	time                        int32
+	pods, ips, protocols, ports, macs string
+	time                              int32
 
 	// Commands
 	captureCmd = flag.NewFlagSet("capture", flag.ExitOnError)
@@ -121,11 +109,12 @@ func setupCommonFlags() {
 }
 
 func setupCaptureFlags() {
-	captureCmd.Int32VarP(&time, "time", "d", 0, "Time to run packet capture for (in seconds). Runs indefinitely given 0.")
+	captureCmd.StringVarP(&pods, "pods", "p", "", "Specify which pods the capture should filter on. Supports up to two pod names. Automatically defines nodes to capture on.")
 	captureCmd.StringVarP(&ips, "ips", "i", "", "Match source or destination IP address. CIDR supported.")
 	captureCmd.StringVarP(&protocols, "protocols", "t", "", "Match by transport protocol (TCP, UDP, ICMP).")
-	captureCmd.StringVarP(&ports, "ports", "p", "", "Match source or destination port number.")
+	captureCmd.StringVarP(&ports, "ports", "r", "", "Match source or destination port number.")
 	captureCmd.StringVarP(&macs, "macs", "m", "", "Match source or destination MAC address.")
+	captureCmd.Int32VarP(&time, "time", "d", 0, "Time to run packet capture for (in seconds). Runs indefinitely given 0.")
 }
 
 func main() {
@@ -136,6 +125,7 @@ func main() {
 		vlog.Fatalf(winspectHelpString)
 	}
 
+	// CLI structure
 	cmd := os.Args[1]
 	subcmd := ""
 	switch cmd {
@@ -176,31 +166,37 @@ func main() {
 		log.Fatal(err)
 	}
 
-	// Pull nodes and pods
+	// Pull nodes
 	nodeset, err := clientset.CoreV1().Nodes().List(context.TODO(), metav1.ListOptions{})
 	if err != nil {
 		log.Fatal(err)
 	}
 
-	// pods, err := clientset.CoreV1().Pods(namespace).List(context.TODO(), metav1.ListOptions{})
-	// if err != nil {
-	// 	log.Fatal(err)
-	// }
-
-	// NEED: list of ips from nodes that have a windows os; map to translate between node name -> node ip;
-	//			map of pod name -> pod ip; map of pod name -> node ip
+	// Pull pods
+	podset, err := clientset.CoreV1().Pods(namespace).List(context.TODO(), metav1.ListOptions{})
+	if err != nil {
+		log.Fatal(err)
+	}
 
 	// Create params struct
+	podsArg, nodesArg := parseValidatePods(pods, podset.Items)
+
 	args := params{
 		cmd:       cmd,
 		subcmd:    subcmd,
-		nodes:     parseValidateNodes(nodes, nodeset.Items),
+		pods:      podsArg,
 		ips:       parseValidateIPAddrs(ips),
 		protocols: parseValidateProts(protocols),
 		ports:     parseValidatePorts(ports),
 		macs:      parseValidateMACAddrs(macs),
 		time:      validateTime(time),
 	}
+
+	addPort := func(s string) string { return s + ":" + common.DefaultServerPort }
+	if len(podsArg) == 0 {
+		nodesArg = parseValidateNodes(nodes, nodeset.Items)
+	}
+	args.nodes = comprise.Map(nodesArg, addPort)
 
 	// Capture any sigint to send a StopCapture request
 	c := make(chan os.Signal)
@@ -259,6 +255,7 @@ func runCaptureStream(c pb.CaptureServiceClient, args *params, ip string) {
 		Duration:  args.time,
 		Timestamp: timestamppb.Now(),
 		Filter: &pb.Filters{
+			Pods:      args.pods,
 			Ips:       args.ips,
 			Protocols: args.protocols,
 			Ports:     args.ports,
@@ -314,4 +311,18 @@ func printHCNLogs(c pb.HCNServiceClient, args *params, ip string) {
 	}
 
 	fmt.Printf("Received logs for %s (from IP: %s): \n%s\n", hcntype, ip, string(res.GetHcnResult()))
+}
+
+func cleanup(nodes []string) {
+	var wg sync.WaitGroup
+	for _, ip := range nodes {
+		// Increment the WaitGroup counter
+		wg.Add(1)
+
+		// Launch a goroutine to run the capture
+		go createConnectionAndRoute(ip, &params{cmd: "stop"}, &wg)
+	}
+
+	// Wait for all captures to complete
+	wg.Wait()
 }

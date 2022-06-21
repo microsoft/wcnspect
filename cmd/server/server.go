@@ -16,6 +16,7 @@ import (
 	"time"
 
 	"github.com/microsoft/winspect/common"
+	"github.com/microsoft/winspect/pkg/nets"
 	pb "github.com/microsoft/winspect/rpc"
 
 	"github.com/Microsoft/hcsshim/hcn"
@@ -78,10 +79,12 @@ func pktmonStream(stdout *io.ReadCloser) <-chan string {
 
 func (s *captureServer) StartCapture(req *pb.CaptureRequest, stream pb.CaptureService_StartCaptureServer) error {
 	fmt.Printf("StartCapture function was invoked with %v\n", req)
+	pktmonStartCommand := "pktmon start -c -m real-time"
 
 	// Retrieve and format request arguments
 	dur := req.GetDuration()
 	filter := req.GetFilter()
+	pods := filter.GetPods()
 	args := map[string][]string{
 		"protocols": filter.GetProtocols(),
 		"ips":       filter.GetIps(),
@@ -125,14 +128,19 @@ func (s *captureServer) StartCapture(req *pb.CaptureRequest, stream pb.CaptureSe
 		}
 	}
 
+	// If we have pod IPs, then change the pktmonStartCommand
+	if len(pods) > 0 {
+		podIDs := nets.GetPodIDs(pods)
+		pktmonStartCommand += fmt.Sprintf(" --comp %s", strings.Join(podIDs, " "))
+	}
+
 	// Create a timeout context and set as server's pktmon canceller
 	ctx, cancel := context.WithTimeout(context.Background(), time.Duration(dur)*time.Second)
 	s.pktContextCancel = cancel
-	defer cancel()
 
 	// Execute pktmon command and check for errors, if successful, set as server's currMonitor
 	exec.Command("cmd", "/c", "pktmon stop").Run()
-	cmd := exec.CommandContext(ctx, "cmd", "/c", "pktmon start -c -m real-time")
+	cmd := exec.CommandContext(ctx, "cmd", "/c", pktmonStartCommand)
 	stdout, err := cmd.StdoutPipe()
 	if err != nil {
 		log.Fatal(err)
@@ -169,6 +177,7 @@ func (s *captureServer) StartCapture(req *pb.CaptureRequest, stream pb.CaptureSe
 	wg.Wait()
 
 	// Reset pktmon filters, server's currMonitor, and server's pktContextCancel
+	cancel()
 	resetPktmon(false, true)
 	s.currMonitor = nil
 	s.pktContextCancel = nil
@@ -184,6 +193,8 @@ func (s *captureServer) StopCapture(ctx context.Context, req *pb.Empty) (*pb.Emp
 		s.currMonitor.Process.Kill()
 		s.pktContextCancel()
 		log.Printf("Successfully killed packet capture stream.\n")
+	} else {
+		log.Printf("Packet capture stream not found.\n")
 	}
 
 	return req, nil
