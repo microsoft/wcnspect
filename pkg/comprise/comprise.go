@@ -28,6 +28,14 @@ func Unique(ls []string) (ret []string) {
 	return
 }
 
+func CreateEmptyMap(ls []string) map[string][]string {
+	ret := make(map[string][]string)
+	for _, value := range ls {
+		ret[value] = []string{}
+	}
+	return ret
+}
+
 // Methods for maps
 func Keys[K comparable, V any](m map[K]V) []K {
 	keys := make([]K, len(m))

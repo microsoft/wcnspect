@@ -256,7 +256,7 @@ func main() {
 	if err != nil {
 		log.Fatalf("Failed to listen: %v", err)
 	}
-	fmt.Print("Server started")
+	fmt.Printf("Server started on port %s\n", port)
 	s := grpc.NewServer()
 	pb.RegisterCaptureServiceServer(s, &captureServer{})
 	pb.RegisterHCNServiceServer(s, &hcnServer{})

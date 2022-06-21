@@ -23,13 +23,13 @@ func validateTime(time int32) int32 {
 	return time
 }
 
-func parseValidateNodes(nodes string, nodeset []v1.Node) []string {
+func parseValidateNodes(nodes string, nodeset []v1.Node) map[string][]string {
 	winNodes := k8spi.FilterNodes(nodeset, k8spi.WindowsOS)
 	winMap := k8spi.GetNodeMap(winNodes)
 	winNames, winIPs := comprise.Keys(winMap), comprise.Values(winMap)
 
 	if len(nodes) == 0 {
-		return winIPs
+		return comprise.CreateEmptyMap(winIPs)
 	}
 
 	names := strings.Split(nodes, ",")
@@ -40,16 +40,17 @@ func parseValidateNodes(nodes string, nodeset []v1.Node) []string {
 	}
 
 	translateName := func(name string) string { return winMap[name] }
-	return comprise.Map(names, translateName)
+	return comprise.CreateEmptyMap(comprise.Map(names, translateName))
 }
 
-func parseValidatePods(pods string, podset []v1.Pod) ([]string, []string) {
+func parseValidatePods(pods string, podset []v1.Pod) map[string][]string {
+	ret := make(map[string][]string)
 	if len(pods) == 0 {
-		return []string{}, []string{}
+		return ret
 	}
 
-	podMapIP, podMapNodes := k8spi.GetPodMaps(podset)
-	podNames := comprise.Keys(podMapIP)
+	podIPs, podNodes := k8spi.GetPodMaps(podset)
+	podNames := comprise.Keys(podIPs)
 
 	names := strings.Split(pods, ",")
 	for _, pod := range names {
@@ -58,9 +59,12 @@ func parseValidatePods(pods string, podset []v1.Pod) ([]string, []string) {
 		}
 	}
 
-	translateForIP := func(name string) string { return podMapIP[name] }
-	translateForNode := func(name string) string { return podMapNodes[name] }
-	return comprise.Map(names, translateForIP), comprise.Unique(comprise.Map(names, translateForNode))
+	for _, pod := range names {
+		podIP, nodeIP := podIPs[pod], podNodes[pod]
+		ret[nodeIP] = append(ret[nodeIP], podIP)
+	}
+
+	return ret
 }
 
 func parseValidateIPAddrs(ips string) []string {

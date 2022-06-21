@@ -57,8 +57,7 @@ Flags
 type params struct {
 	cmd       string
 	subcmd    string
-	nodes     []string
-	pods      []string
+	hosts     map[string][]string
 	ips       []string
 	protocols []string
 	ports     []string
@@ -179,12 +178,11 @@ func main() {
 	}
 
 	// Create params struct
-	podsArg, nodesArg := parseValidatePods(pods, podset.Items)
+	hosts := parseValidatePods(pods, podset.Items)
 
 	args := params{
 		cmd:       cmd,
 		subcmd:    subcmd,
-		pods:      podsArg,
 		ips:       parseValidateIPAddrs(ips),
 		protocols: parseValidateProts(protocols),
 		ports:     parseValidatePorts(ports),
@@ -192,24 +190,24 @@ func main() {
 		time:      validateTime(time),
 	}
 
-	addPort := func(s string) string { return s + ":" + common.DefaultServerPort }
-	if len(podsArg) == 0 {
-		nodesArg = parseValidateNodes(nodes, nodeset.Items)
+	if len(hosts) == 0 {
+		hosts = parseValidateNodes(nodes, nodeset.Items)
 	}
-	args.nodes = comprise.Map(nodesArg, addPort)
+	args.hosts = hosts
+	nodeIPs := comprise.Keys(args.hosts)
 
 	// Capture any sigint to send a StopCapture request
 	c := make(chan os.Signal)
 	signal.Notify(c, os.Interrupt, syscall.SIGINT, syscall.SIGTERM)
 	go func() {
 		<-c
-		cleanup(args.nodes)
+		cleanup(nodeIPs)
 		os.Exit(1)
 	}()
 
 	// Create waitgroup to maintain each connection
 	var wg sync.WaitGroup
-	for _, ip := range args.nodes {
+	for _, ip := range nodeIPs {
 		// Increment the WaitGroup counter
 		wg.Add(1)
 
@@ -225,7 +223,8 @@ func createConnectionAndRoute(ip string, args *params, wg *sync.WaitGroup) {
 	// Decrement relevant waitgroup counter when goroutine completes
 	defer wg.Done()
 
-	cc, err := grpc.Dial(ip, grpc.WithInsecure())
+	//FIXME: hardcoded port addition
+	cc, err := grpc.Dial(ip+":"+common.DefaultServerPort, grpc.WithInsecure())
 	if err != nil {
 		log.Fatalf("could not connect: %v", err)
 	}
@@ -246,16 +245,15 @@ func createConnectionAndRoute(ip string, args *params, wg *sync.WaitGroup) {
 }
 
 func runCaptureStream(c pb.CaptureServiceClient, args *params, ip string) {
-	// Capture any sigint to send a StopCapture request
-
 	fmt.Printf("Starting to do a Server Streaming RPC (from IP: %s)...\n", ip)
+	pods := args.hosts[ip]
 
 	// Create request object
 	req := &pb.CaptureRequest{
 		Duration:  args.time,
 		Timestamp: timestamppb.Now(),
 		Filter: &pb.Filters{
-			Pods:      args.pods,
+			Pods:      pods,
 			Ips:       args.ips,
 			Protocols: args.protocols,
 			Ports:     args.ports,
