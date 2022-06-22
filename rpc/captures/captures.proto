@@ -1,0 +1,39 @@
+syntax = "proto3";
+option go_package = "github.com/microsoft/winspect/rpc";
+package winspect.captures;
+
+import "google/protobuf/timestamp.proto";
+
+
+// models
+message Filters {
+	repeated string pods = 1;
+	repeated string ips = 2;
+	repeated string protocols = 3;
+	repeated string ports = 4;
+	repeated string macs = 5;
+}
+
+message Empty {
+
+}
+
+// requests
+message CaptureRequest {
+	int32 duration = 1;
+	google.protobuf.Timestamp timestamp = 2;
+	Filters filter = 3;
+}
+
+// responses
+message CaptureResponse {
+	string result = 1;
+	google.protobuf.Timestamp timestamp = 2;
+}
+
+// service
+service CaptureService {
+	rpc StartCapture(CaptureRequest) returns (stream CaptureResponse) {}
+	
+	rpc StopCapture(Empty) returns (Empty) {}
+}
