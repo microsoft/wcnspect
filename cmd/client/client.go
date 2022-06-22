@@ -45,12 +45,15 @@ Commands
 const hnsHelpString string = `winspect hns <command> [OPTIONS]
 
 Commands
-    loadbalancers    	Retrieve logs for loadbalancers on each node.
+    all                 Retrieve all hnsdiag logs on each node.
     endpoints        	Retrieve logs for endpoints on each node.
+    loadbalancers    	Retrieve logs for loadbalancers on each node.
+    namespaces          Retrieve logs for namespaces on each node.
     networks         	Retrieve logs for networks on each node.
 
 Flags
     -n, --nodes string	Specify which nodes winspect should send requests to using node names. Runs on all windows nodes by default.
+    -d, --json          Detailed option for logs.
 
 `
 
@@ -63,6 +66,7 @@ type params struct {
 	ports     []string
 	macs      []string
 	time      int32
+	json      bool
 }
 
 type client struct {
@@ -78,6 +82,9 @@ var (
 	// Capture flags
 	pods, ips, protocols, ports, macs string
 	time                              int32
+
+	// Hns flags
+	json bool
 
 	// Commands
 	captureCmd = flag.NewFlagSet("capture", flag.ExitOnError)
@@ -116,9 +123,14 @@ func setupCaptureFlags() {
 	captureCmd.Int32VarP(&time, "time", "d", 0, "Time to run packet capture for (in seconds). Runs indefinitely given 0.")
 }
 
+func setupHnsFlags() {
+	hnsCmd.BoolVarP(&json, "json", "d", false, "Detailed option for logs.")
+}
+
 func main() {
 	setupCommonFlags()
 	setupCaptureFlags()
+	setupHnsFlags()
 
 	if len(os.Args) < 2 {
 		vlog.Fatalf(winspectHelpString)
@@ -188,6 +200,7 @@ func main() {
 		ports:     parseValidatePorts(ports),
 		macs:      parseValidateMACAddrs(macs),
 		time:      validateTime(time),
+		json:      json,
 	}
 
 	if len(hosts) == 0 {
@@ -300,6 +313,7 @@ func printHCNLogs(c pb.HCNServiceClient, args *params, ip string) {
 	// Create request object
 	req := &pb.HCNRequest{
 		Hcntype: pb.HCNType(pb.HCNType_value[hcntype]),
+		Json:    args.json,
 	}
 
 	// Send request
@@ -308,7 +322,7 @@ func printHCNLogs(c pb.HCNServiceClient, args *params, ip string) {
 		log.Fatalf("error while calling GetHCNLogs RPC (from IP: %s): %v", ip, err)
 	}
 
-	fmt.Printf("Received logs for %s (from IP: %s): \n%s\n", hcntype, ip, string(res.GetHcnResult()))
+	fmt.Printf("Received logs for %s (from IP: %s):\n\n%s\n", hcntype, ip, string(res.GetHcnResult()))
 }
 
 func cleanup(nodes []string) {
