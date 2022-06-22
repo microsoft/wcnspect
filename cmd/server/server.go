@@ -3,7 +3,6 @@ package main
 import (
 	"bufio"
 	"context"
-	"encoding/json"
 	"fmt"
 	"io"
 	"log"
@@ -18,8 +17,6 @@ import (
 	"github.com/microsoft/winspect/common"
 	"github.com/microsoft/winspect/pkg/nets"
 	pb "github.com/microsoft/winspect/rpc"
-
-	"github.com/Microsoft/hcsshim/hcn"
 
 	flag "github.com/spf13/pflag"
 	"google.golang.org/grpc"
@@ -202,38 +199,14 @@ func (s *captureServer) StopCapture(ctx context.Context, req *pb.Empty) (*pb.Emp
 
 func (*hcnServer) GetHCNLogs(ctx context.Context, req *pb.HCNRequest) (*pb.HCNResponse, error) {
 	hcntype := pb.HCNType(req.GetHcntype())
-	obj := []byte{}
-	var lerr, jerr error
+	viewJson := req.GetJson()
 
 	fmt.Printf("GetHCNLogs function was invoked for %s.\n", hcntype)
 
-	switch hcntype {
-	case pb.HCNType_networks:
-		var networks []hcn.HostComputeNetwork
-		networks, lerr = hcn.ListNetworks()
-		obj, jerr = json.Marshal(networks)
-	case pb.HCNType_endpoints:
-		var endpoints []hcn.HostComputeEndpoint
-		endpoints, lerr = hcn.ListEndpoints()
-		obj, jerr = json.Marshal(endpoints)
-	case pb.HCNType_loadbalancers:
-		var lbs []hcn.HostComputeLoadBalancer
-		lbs, lerr = hcn.ListLoadBalancers()
-		obj, jerr = json.Marshal(lbs)
-	}
-
-	if lerr != nil {
-		log.Fatal(lerr)
-	}
-
-	if jerr != nil {
-		log.Fatal(jerr)
-	}
-
+	logs := nets.GetLogs(hcntype.String(), viewJson)
 	res := &pb.HCNResponse{
-		HcnResult: obj,
+		HcnResult: logs,
 	}
-
 	log.Printf("Sending: \n%v", res)
 
 	return res, nil

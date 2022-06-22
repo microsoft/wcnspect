@@ -4,14 +4,17 @@ package winspect.hcn;
 
 
 enum HCNType {
-	loadbalancers = 0;
+	all = 0;
 	endpoints = 1;
-	networks = 2;
+	loadbalancers = 2;
+	namespaces = 3;
+	networks = 4;
 }
 
 // requests
 message HCNRequest {
 	HCNType hcntype = 1;
+	bool json = 2;
 }
 
 // responses
