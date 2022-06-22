@@ -1,6 +1,5 @@
 # Ignore client and server executables
-winspect.exe
-winspectserv.exe
+*.exe
 Pktmon.etl
 
 

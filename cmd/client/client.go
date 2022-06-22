@@ -7,19 +7,24 @@ import (
 	"log"
 	"os"
 	"os/signal"
+	"path/filepath"
 	"sync"
 	"syscall"
 
+	"github.com/microsoft/winspect/common"
 	"github.com/microsoft/winspect/pkg/comprise"
 	pb "github.com/microsoft/winspect/rpc"
 
 	flag "github.com/spf13/pflag"
 	"google.golang.org/grpc"
 	"google.golang.org/protobuf/types/known/timestamppb"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/client-go/kubernetes"
+	"k8s.io/client-go/tools/clientcmd"
+	"k8s.io/client-go/util/homedir"
 )
 
-var validCommands = []string{"capture", "hns", "help"}
-
+const namespace string = "default"
 const winspectHelpString string = `winspect <command> [OPTIONS | help]
     Advanced distributed packet capture and HNS log collection.
 
@@ -30,27 +35,29 @@ Commands
     help       Show help text for specific command.
                Example: winspect capture help
 
-    --help     Show help for available flags.
-
 `
 const captureHelpString string = `winspect capture <command>
 
 Commands
     --help    Show help for available flags.
+
 `
 const hnsHelpString string = `winspect hns <command> [OPTIONS]
 
 Commands
-    loadbalancers    Retrieve logs for loadbalancers on each node.
-    endpoints        Retrieve logs for endpoints on each node.
-    networks         Retrieve logs for networks on each node.
+    loadbalancers    	Retrieve logs for loadbalancers on each node.
+    endpoints        	Retrieve logs for endpoints on each node.
+    networks         	Retrieve logs for networks on each node.
+
+Flags
+    -n, --nodes string	Specify which nodes winspect should send requests to using node names. Runs on all windows nodes by default.
 
 `
 
 type params struct {
 	cmd       string
 	subcmd    string
-	nodes     []string
+	hosts     map[string][]string
 	ips       []string
 	protocols []string
 	ports     []string
@@ -63,76 +70,119 @@ type client struct {
 	pb.HCNServiceClient
 }
 
-func cleanup(nodes []string) {
-	var wg sync.WaitGroup
-	for _, ip := range nodes {
-		// Increment the WaitGroup counter
-		wg.Add(1)
+var (
+	// Shared flags
+	kubeconfig *string
+	nodes      string
 
-		// Launch a goroutine to run the capture
-		go createConnectionAndRoute(ip, &params{cmd: "stop"}, &wg)
+	// Capture flags
+	pods, ips, protocols, ports, macs string
+	time                              int32
+
+	// Commands
+	captureCmd = flag.NewFlagSet("capture", flag.ExitOnError)
+	hnsCmd     = flag.NewFlagSet("hns", flag.ExitOnError)
+	helpCmd    = flag.NewFlagSet("help", flag.ExitOnError)
+)
+
+var subcommands = map[string]*flag.FlagSet{
+	"capture": captureCmd,
+	"hns":     hnsCmd,
+	"help":    helpCmd,
+}
+
+func setupCommonFlags() {
+	for name, fs := range subcommands {
+		if name == "help" {
+			continue
+		}
+
+		if home := homedir.HomeDir(); home != "" {
+			kubeconfig = fs.String("kubeconfig", filepath.Join(home, ".kube", "config"), "(optional) absolute path to the kubeconfig file")
+		} else {
+			kubeconfig = fs.String("kubeconfig", "", "absolute path to the kubeconfig file")
+		}
+
+		fs.StringVarP(&nodes, "nodes", "n", "", "Specify which nodes winspect should send requests to using node names. Runs on all windows nodes by default.")
 	}
+}
 
-	// Wait for all captures to complete
-	wg.Wait()
+func setupCaptureFlags() {
+	captureCmd.StringVarP(&pods, "pods", "p", "", "Specify which pods the capture should filter on. Supports up to two pod names. Automatically defines nodes to capture on.")
+	captureCmd.StringVarP(&ips, "ips", "i", "", "Match source or destination IP address. CIDR supported.")
+	captureCmd.StringVarP(&protocols, "protocols", "t", "", "Match by transport protocol (TCP, UDP, ICMP).")
+	captureCmd.StringVarP(&ports, "ports", "r", "", "Match source or destination port number.")
+	captureCmd.StringVarP(&macs, "macs", "m", "", "Match source or destination MAC address.")
+	captureCmd.Int32VarP(&time, "time", "d", 0, "Time to run packet capture for (in seconds). Runs indefinitely given 0.")
 }
 
 func main() {
-	// User input variables
-	var nodes, ips, protocols, ports, macs string
-	var time int32
+	setupCommonFlags()
+	setupCaptureFlags()
 
-	// Flags
-	flag.Int32VarP(&time, "time", "d", 0, "Time to run packet capture for (in seconds). Runs indefinitely given 0.")
-	flag.StringVarP(&nodes, "nodes", "n", "", "Specify which nodes winspect should send requests to using node IPs. This field is required.")
-	flag.StringVarP(&ips, "ips", "i", "", "Match source or destination IP address. CIDR supported.")
-	flag.StringVarP(&protocols, "protocols", "t", "", "Match by transport protocol (TCP, UDP, ICMP).")
-	flag.StringVarP(&ports, "ports", "p", "", "Match source or destination port number.")
-	flag.StringVarP(&macs, "macs", "m", "", "Match source or destination MAC address.")
-	flag.Parse()
-
-	// Some temporary hardcoded error handling for input
-	if len(os.Args) <= 1 {
-		fmt.Println(winspectHelpString)
-		return
+	if len(os.Args) < 2 {
+		vlog.Fatalf(winspectHelpString)
 	}
 
+	// CLI structure
 	cmd := os.Args[1]
-	if !comprise.Contains(validCommands, cmd) {
-		fmt.Printf("Unknown command '%s'. See winspect help.\n", cmd)
-		return
-	}
+	subcmd := ""
+	switch cmd {
+	case "capture":
+		if len(os.Args) > 2 {
+			subcommands[cmd].Parse(os.Args[2:])
 
-	if cmd == "help" {
-		fmt.Println(winspectHelpString)
-		return
-	}
-
-	if cmd == "hns" && len(os.Args) <= 1 && !comprise.Contains(comprise.GetKeys(pb.HCNType_value), os.Args[2]) {
-		fmt.Printf("Unknown command '%s'. See winspect hcn help.\n", os.Args[2])
-		return
-	}
-
-	if len(os.Args) >= 3 && os.Args[2] == "help" {
-		switch cmd {
-		case "capture":
-			fmt.Println(captureHelpString)
-		case "hns":
-			fmt.Println(hnsHelpString)
+			if os.Args[2] == "help" {
+				vlog.Fatalf(captureHelpString)
+			}
 		}
-		return
+	case "hns":
+		if len(os.Args) < 3 || os.Args[2] == "help" {
+			vlog.Fatalf(hnsHelpString)
+		}
+
+		subcmd = os.Args[2]
+		subcommands[cmd].Parse(os.Args[2:])
+
+		if !comprise.Contains(comprise.Keys(pb.HCNType_value), subcmd) {
+			vlog.Fatalf("Unknown command '%s'. See winspect hns help.", subcmd)
+		}
+	case "help":
+		vlog.Fatalf(winspectHelpString)
+	default:
+		vlog.Fatalf("Unknown subcommand '%s', see winspect help for more details.", cmd)
 	}
 
-	if len(nodes) == 0 {
-		fmt.Println("Must pass at least one IP to the --nodes flag.")
-		return
+	// use the current context in kubeconfig
+	config, err := clientcmd.BuildConfigFromFlags("", *kubeconfig)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	// create the clientset
+	clientset, err := kubernetes.NewForConfig(config)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	// Pull nodes
+	nodeset, err := clientset.CoreV1().Nodes().List(context.TODO(), metav1.ListOptions{})
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	// Pull pods
+	podset, err := clientset.CoreV1().Pods(namespace).List(context.TODO(), metav1.ListOptions{})
+	if err != nil {
+		log.Fatal(err)
 	}
 
 	// Create params struct
+	hosts := parseValidatePods(pods, podset.Items)
+
 	args := params{
 		cmd:       cmd,
-		subcmd:    os.Args[2],
-		nodes:     parseValidateNodes(nodes),
+		subcmd:    subcmd,
 		ips:       parseValidateIPAddrs(ips),
 		protocols: parseValidateProts(protocols),
 		ports:     parseValidatePorts(ports),
@@ -140,18 +190,24 @@ func main() {
 		time:      validateTime(time),
 	}
 
+	if len(hosts) == 0 {
+		hosts = parseValidateNodes(nodes, nodeset.Items)
+	}
+	args.hosts = hosts
+	nodeIPs := comprise.Keys(args.hosts)
+
 	// Capture any sigint to send a StopCapture request
 	c := make(chan os.Signal)
 	signal.Notify(c, os.Interrupt, syscall.SIGINT, syscall.SIGTERM)
 	go func() {
 		<-c
-		cleanup(args.nodes)
+		cleanup(nodeIPs)
 		os.Exit(1)
 	}()
 
 	// Create waitgroup to maintain each connection
 	var wg sync.WaitGroup
-	for _, ip := range args.nodes {
+	for _, ip := range nodeIPs {
 		// Increment the WaitGroup counter
 		wg.Add(1)
 
@@ -167,7 +223,8 @@ func createConnectionAndRoute(ip string, args *params, wg *sync.WaitGroup) {
 	// Decrement relevant waitgroup counter when goroutine completes
 	defer wg.Done()
 
-	cc, err := grpc.Dial(ip, grpc.WithInsecure())
+	//FIXME: hardcoded port addition
+	cc, err := grpc.Dial(ip+":"+common.DefaultServerPort, grpc.WithInsecure())
 	if err != nil {
 		log.Fatalf("could not connect: %v", err)
 	}
@@ -188,15 +245,15 @@ func createConnectionAndRoute(ip string, args *params, wg *sync.WaitGroup) {
 }
 
 func runCaptureStream(c pb.CaptureServiceClient, args *params, ip string) {
-	// Capture any sigint to send a StopCapture request
-
 	fmt.Printf("Starting to do a Server Streaming RPC (from IP: %s)...\n", ip)
+	pods := args.hosts[ip]
 
 	// Create request object
 	req := &pb.CaptureRequest{
 		Duration:  args.time,
 		Timestamp: timestamppb.Now(),
 		Filter: &pb.Filters{
+			Pods:      pods,
 			Ips:       args.ips,
 			Protocols: args.protocols,
 			Ports:     args.ports,
@@ -252,4 +309,18 @@ func printHCNLogs(c pb.HCNServiceClient, args *params, ip string) {
 	}
 
 	fmt.Printf("Received logs for %s (from IP: %s): \n%s\n", hcntype, ip, string(res.GetHcnResult()))
+}
+
+func cleanup(nodes []string) {
+	var wg sync.WaitGroup
+	for _, ip := range nodes {
+		// Increment the WaitGroup counter
+		wg.Add(1)
+
+		// Launch a goroutine to run the capture
+		go createConnectionAndRoute(ip, &params{cmd: "stop"}, &wg)
+	}
+
+	// Wait for all captures to complete
+	wg.Wait()
 }
