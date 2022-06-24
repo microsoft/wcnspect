@@ -18,11 +18,11 @@ var hnsCmd = &cobra.Command{
 
 func init() {
 	var nodes []string
-	var json bool
+	var verbose bool
 
 	rootCmd.AddCommand(hnsCmd)
 	hnsCmd.PersistentFlags().StringSliceVarP(&nodes, "nodes", "n", []string{}, "Specify which nodes winspect should send requests to using node names. Runs on all windows nodes by default.")
-	hnsCmd.PersistentFlags().BoolVarP(&json, "json", "d", false, "Detailed option for logs.")
+	hnsCmd.PersistentFlags().BoolVarP(&verbose, "json", "d", false, "Detailed option for logs.")
 
 	logTypes := []string{"all", "endpoints", "loadbalancers", "namespaces", "networks"}
 	logHelp := map[string]string{
@@ -49,7 +49,7 @@ func getLogs(cmd *cobra.Command, args []string) {
 		log.Print(err)
 	}
 
-	json, err := cmd.Flags().GetBool("json")
+	verbose, err := cmd.Flags().GetBool("json")
 	if err != nil {
 		log.Print(err)
 	}
@@ -65,7 +65,7 @@ func getLogs(cmd *cobra.Command, args []string) {
 		c, closeClient := client.CreateConnection(ip)
 		defer closeClient()
 
-		params := client.HCNParams{Cmd: cmd.Name(), Node: ip, Json: json}
+		params := client.HCNParams{Cmd: cmd.Name(), Node: ip, Verbose: verbose}
 		go client.PrintHCNLogs(c, &params, &wg)
 	}
 

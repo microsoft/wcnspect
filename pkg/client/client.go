@@ -25,9 +25,9 @@ type CaptureParams struct {
 }
 
 type HCNParams struct {
-	Cmd  string
-	Node string
-	Json bool
+	Cmd     string
+	Node    string
+	Verbose bool
 }
 
 type client struct {
@@ -113,7 +113,7 @@ func PrintHCNLogs(c pb.HCNServiceClient, args *HCNParams, wg *sync.WaitGroup) {
 	// Create request object
 	req := &pb.HCNRequest{
 		Hcntype: pb.HCNType(pb.HCNType_value[hcntype]),
-		Json:    args.Json,
+		Verbose: args.Verbose,
 	}
 
 	// Send request

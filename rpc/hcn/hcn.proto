@@ -14,7 +14,7 @@ enum HCNType {
 // requests
 message HCNRequest {
 	HCNType hcntype = 1;
-	bool json = 2;
+	bool verbose = 2;
 }
 
 // responses

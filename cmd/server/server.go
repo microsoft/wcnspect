@@ -199,11 +199,11 @@ func (s *captureServer) StopCapture(ctx context.Context, req *pb.Empty) (*pb.Emp
 
 func (*hcnServer) GetHCNLogs(ctx context.Context, req *pb.HCNRequest) (*pb.HCNResponse, error) {
 	hcntype := pb.HCNType(req.GetHcntype())
-	viewJson := req.GetJson()
+	verbose := req.GetVerbose()
 
 	fmt.Printf("GetHCNLogs function was invoked for %s.\n", hcntype)
 
-	logs := nets.GetLogs(hcntype.String(), viewJson)
+	logs := nets.GetLogs(hcntype.String(), verbose)
 	res := &pb.HCNResponse{
 		HcnResult: logs,
 	}
