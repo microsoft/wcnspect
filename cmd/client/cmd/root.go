@@ -33,6 +33,8 @@ Complete documentation isn't available yet (._.;)`,
 }
 
 func init() {
+	rootCmd.CompletionOptions.DisableDefaultCmd = true
+
 	if home := homedir.HomeDir(); home != "" {
 		rootCmd.PersistentFlags().StringVar(&kubeconfig, "kubeconfig", filepath.Join(home, ".kube", "config"), "Optionally specify absolute path to the kubeconfig file.")
 	} else {
