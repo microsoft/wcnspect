@@ -59,7 +59,6 @@ func pktmonStream(stdout *io.ReadCloser) <-chan string {
 	scanner := bufio.NewScanner(*stdout)
 	scanner.Split(bufio.ScanLines)
 	go func(s *bufio.Scanner) {
-		s.Split(bufio.ScanLines)
 		for s.Scan() {
 			c <- s.Text()
 		}
