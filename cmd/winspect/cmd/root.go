@@ -28,8 +28,7 @@ var (
 var rootCmd = &cobra.Command{
 	Use:   "winspect",
 	Short: "Winspect is an advanced distributed packet capture and HNS log collection tool.",
-	Long: `An advanced distributed packet capture and HNS log collection tool made with Go and fueled by fried chicken.
-Complete documentation isn't available yet (._.;)`,
+	Long:  `An advanced distributed packet capture and HNS log collection tool made with Go (^‿^)`,
 }
 
 func init() {

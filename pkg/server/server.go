@@ -1,4 +1,4 @@
-package main
+package server
 
 import (
 	"bufio"
@@ -7,20 +7,14 @@ import (
 	"io"
 	"log"
 	"math"
-	"net"
 	"os/exec"
-	"strconv"
 	"strings"
 	"sync"
 	"time"
 
-	"github.com/microsoft/winspect/common"
 	"github.com/microsoft/winspect/pkg/nets"
 	pb "github.com/microsoft/winspect/rpc"
 
-	flag "github.com/spf13/pflag"
-	"google.golang.org/grpc"
-	"google.golang.org/grpc/reflection"
 	"google.golang.org/protobuf/types/known/timestamppb"
 )
 
@@ -31,13 +25,13 @@ var pktParams = map[string]string{
 	"macs":      "-m",
 }
 
-type captureServer struct {
+type CaptureServer struct {
 	pb.UnimplementedCaptureServiceServer
 	currMonitor      *exec.Cmd          // Tracks the running pktmon stream
 	pktContextCancel context.CancelFunc // Tracks the pktmon stream's context's cancel func
 }
 
-type hcnServer struct {
+type HcnServer struct {
 	pb.UnimplementedHCNServiceServer
 }
 
@@ -74,7 +68,7 @@ func pktmonStream(stdout *io.ReadCloser) <-chan string {
 	return c
 }
 
-func (s *captureServer) StartCapture(req *pb.CaptureRequest, stream pb.CaptureService_StartCaptureServer) error {
+func (s *CaptureServer) StartCapture(req *pb.CaptureRequest, stream pb.CaptureService_StartCaptureServer) error {
 	fmt.Printf("StartCapture function was invoked with %v\n", req)
 	pktmonStartCommand := "pktmon start -c -m real-time"
 
@@ -183,7 +177,7 @@ func (s *captureServer) StartCapture(req *pb.CaptureRequest, stream pb.CaptureSe
 	return nil
 }
 
-func (s *captureServer) StopCapture(ctx context.Context, req *pb.Empty) (*pb.Empty, error) {
+func (s *CaptureServer) StopCapture(ctx context.Context, req *pb.Empty) (*pb.Empty, error) {
 	fmt.Println("StopCapture function was invoked.")
 
 	if s.currMonitor != nil {
@@ -197,7 +191,7 @@ func (s *captureServer) StopCapture(ctx context.Context, req *pb.Empty) (*pb.Emp
 	return req, nil
 }
 
-func (*hcnServer) GetHCNLogs(ctx context.Context, req *pb.HCNRequest) (*pb.HCNResponse, error) {
+func (*HcnServer) GetHCNLogs(ctx context.Context, req *pb.HCNRequest) (*pb.HCNResponse, error) {
 	hcntype := pb.HCNType(req.GetHcntype())
 	verbose := req.GetVerbose()
 
@@ -210,34 +204,4 @@ func (*hcnServer) GetHCNLogs(ctx context.Context, req *pb.HCNRequest) (*pb.HCNRe
 	log.Printf("Sending: \n%v", res)
 
 	return res, nil
-}
-
-func main() {
-	// User input variables
-	var port string
-
-	// Flags
-	flag.StringVarP(&port, "port", "p", common.DefaultServerPort, "Specify port for server to listen on.")
-	flag.Parse()
-
-	// Input validation
-	if _, err := strconv.Atoi(port); err != nil {
-		log.Fatalf("Supplied value was not a valid port.")
-	}
-
-	listener, err := net.Listen("tcp", "0.0.0.0:"+port)
-	if err != nil {
-		log.Fatalf("Failed to listen: %v", err)
-	}
-	fmt.Printf("Server started on port %s\n", port)
-	s := grpc.NewServer()
-	pb.RegisterCaptureServiceServer(s, &captureServer{})
-	pb.RegisterHCNServiceServer(s, &hcnServer{})
-
-	// Register reflection service on gRPC server
-	reflection.Register(s)
-
-	if err := s.Serve(listener); err != nil {
-		log.Fatalf("Failed to serve: %v", err)
-	}
 }
