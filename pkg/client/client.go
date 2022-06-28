@@ -111,9 +111,9 @@ func RunStopCapture(c pb.CaptureServiceClient, ip string, wg *sync.WaitGroup) {
 		log.Fatalf("error while calling StopCapture RPC (from IP: %s): %v", ip, err)
 	}
 
-	msg, timestamp := res.GetResult(), res.GetTimestamp()
+	msg, timestamp := res.GetResult(), res.GetTimestamp().AsTime()
 	if len(msg) != 0 {
-		fmt.Printf("StopCapture successfully ran on IP: %s at time: %s with output: \n%s\n", ip, timestamp.AsTime(), msg)
+		fmt.Printf("StopCapture successfully ran on IP: %s at time: %s with output: \n%s\n", ip, timestamp, msg)
 	} else {
 		fmt.Printf("StopCapture successfully ran at time: %s.\n", timestamp)
 	}
