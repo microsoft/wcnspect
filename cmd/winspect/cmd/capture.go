@@ -27,10 +27,12 @@ func init() {
 	rootCmd.AddCommand(captureCmd)
 
 	captureCmd.PersistentFlags().StringSliceVarP(&captureArgs.Ips, "ips", "i", []string{}, "Match source or destination IP address. CIDR supported.")
-	captureCmd.PersistentFlags().StringSliceVarP(&captureArgs.Protocols, "protocols", "t", []string{}, "Match by transport protocol (TCP, UDP, ICMP).")
+	captureCmd.PersistentFlags().StringSliceVarP(&captureArgs.Protocols, "protocols", "t", []string{}, "Match by transport protocol. Can be TCP, UDP, and/or ICMP).")
 	captureCmd.PersistentFlags().StringSliceVarP(&captureArgs.Ports, "ports", "r", []string{}, "Match source or destination port number.")
 	captureCmd.PersistentFlags().StringSliceVarP(&captureArgs.Macs, "macs", "m", []string{}, "Match source or destination MAC address.")
 	captureCmd.PersistentFlags().Int32VarP(&captureArgs.Time, "time", "d", 0, "Time to run packet capture for (in seconds). Runs indefinitely given 0.")
+	captureCmd.PersistentFlags().StringVar(&captureArgs.PacketType, "type", "all", "Select which packets to capture. Can be all, flow, or drop.")
+	captureCmd.PersistentFlags().BoolVar(&captureArgs.CountersOnly, "counters-only", false, "Collect packet counters only. No packet logging.")
 
 	captureTypes := []string{"all", "nodes", "pods"}
 	captureHelp := map[string]string{
@@ -91,14 +93,18 @@ func getCapture(cmd *cobra.Command, args []string) {
 		defer closeClient()
 
 		cArgs := client.CaptureParams{
-			Node:      ip,
-			Pods:      hostMap[ip],
-			Ips:       captureArgs.Ips,
-			Protocols: captureArgs.Protocols,
-			Ports:     captureArgs.Ports,
-			Macs:      captureArgs.Macs,
-			Time:      captureArgs.Time,
+			Node:         ip,
+			Pods:         hostMap[ip],
+			Ips:          captureArgs.Ips,
+			Protocols:    captureArgs.Protocols,
+			Ports:        captureArgs.Ports,
+			Macs:         captureArgs.Macs,
+			Time:         captureArgs.Time,
+			PacketType:   captureArgs.PacketType,
+			CountersOnly: captureArgs.CountersOnly,
 		}
+		cArgs.ValidateCaptureParams()
+
 		go client.RunCaptureStream(c, &cArgs, &wg)
 	}
 

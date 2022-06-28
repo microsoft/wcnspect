@@ -1,14 +1,11 @@
 package server
 
 import (
-	"bufio"
 	"context"
 	"fmt"
-	"io"
 	"log"
 	"math"
 	"os/exec"
-	"strings"
 	"sync"
 	"time"
 
@@ -29,42 +26,11 @@ type CaptureServer struct {
 	pb.UnimplementedCaptureServiceServer
 	currMonitor      *exec.Cmd          // Tracks the running pktmon stream
 	pktContextCancel context.CancelFunc // Tracks the pktmon stream's context's cancel func
+	printCounters    bool
 }
 
 type HcnServer struct {
 	pb.UnimplementedHCNServiceServer
-}
-
-func resetPktmon(captures bool, filters bool) error {
-	// Stop pktmon
-	if captures {
-		if err := exec.Command("cmd", "/c", "pktmon stop").Run(); err != nil {
-			log.Fatalf("Failed to stop pktmon: %v", err)
-		}
-	}
-
-	// Clear filters
-	if filters {
-		if err := exec.Command("cmd", "/c", "pktmon filter remove").Run(); err != nil {
-			log.Fatalf("Failed to remove old filters: %v", err)
-		}
-	}
-
-	return nil
-}
-
-func pktmonStream(stdout *io.ReadCloser) <-chan string {
-	c := make(chan string)
-
-	scanner := bufio.NewScanner(*stdout)
-	scanner.Split(bufio.ScanLines)
-	go func(s *bufio.Scanner) {
-		for s.Scan() {
-			c <- s.Text()
-		}
-	}(scanner)
-
-	return c
 }
 
 func (s *CaptureServer) StartCapture(req *pb.CaptureRequest, stream pb.CaptureService_StartCaptureServer) error {
@@ -73,19 +39,15 @@ func (s *CaptureServer) StartCapture(req *pb.CaptureRequest, stream pb.CaptureSe
 
 	// Retrieve and format request arguments
 	dur := req.GetDuration()
+	modifiers := req.GetModifier()
 	filter := req.GetFilter()
-	pods := filter.GetPods()
-	args := map[string][]string{
+	filterArgs := map[string][]string{
 		"protocols": filter.GetProtocols(),
 		"ips":       filter.GetIps(),
 		"ports":     filter.GetPorts(),
 		"macs":      filter.GetMacs(),
 	}
-
-	// Add an empty protocol since our filtering mechanism depends on there being one
-	if len(args["protocols"]) == 0 {
-		args["protocols"] = append(args["protocols"], "")
-	}
+	s.printCounters = modifiers.GetCountersOnly()
 
 	// If duration is less than 0, we run for an "infinite" amount of time
 	if dur <= 0 {
@@ -94,35 +56,10 @@ func (s *CaptureServer) StartCapture(req *pb.CaptureRequest, stream pb.CaptureSe
 
 	// Ensure filters are reset and add new ones
 	resetPktmon(true, true)
-	for _, protocol := range args["protocols"] {
-		name := " winspect" + protocol + " "
-		filters := []string{}
+	addPktmonFilters(filterArgs)
 
-		// Build filter slice
-		for arg, addrs := range args {
-			// Short circuiting conditional for adding protocol(s) if in filter request
-			if len(addrs) > 0 && len(addrs[0]) > 0 {
-				filters = append(filters, pktParams[arg]+" "+strings.Join(addrs, " "))
-			}
-		}
-
-		// If there are no filters, break
-		if len(filters) == 0 {
-			break
-		}
-
-		// Execute filter command
-		fmt.Println("Applying filters...")
-		if err := exec.Command("cmd", "/c", "pktmon filter add"+name+strings.Join(filters, " ")).Run(); err != nil {
-			log.Fatalf("Failed to add%sfilter: %v", name, err)
-		}
-	}
-
-	// If we have pod IPs, then change the pktmonStartCommand
-	if len(pods) > 0 {
-		podIDs := nets.GetPodIDs(pods)
-		pktmonStartCommand += fmt.Sprintf(" --comp %s", strings.Join(podIDs, " "))
-	}
+	// Revise pktmonStartCommand based on Modifiers
+	pktmonStartCommand = revisePktmonCommand(modifiers, pktmonStartCommand)
 
 	// Create a timeout context and set as server's pktmon canceller
 	ctx, cancel := context.WithTimeout(context.Background(), time.Duration(dur)*time.Second)
@@ -133,10 +70,10 @@ func (s *CaptureServer) StartCapture(req *pb.CaptureRequest, stream pb.CaptureSe
 	cmd := exec.CommandContext(ctx, "cmd", "/c", pktmonStartCommand)
 	stdout, err := cmd.StdoutPipe()
 	if err != nil {
-		log.Fatal(err)
+		log.Print(err)
 	}
 	if err := cmd.Start(); err != nil {
-		log.Fatal(err)
+		log.Print(err)
 	}
 	s.currMonitor = cmd
 
@@ -150,6 +87,11 @@ func (s *CaptureServer) StartCapture(req *pb.CaptureRequest, stream pb.CaptureSe
 		for {
 			select {
 			case out := <-c:
+				if s.printCounters {
+					time.Sleep(time.Millisecond * 100)
+					continue
+				}
+
 				res := &pb.CaptureResponse{
 					Result:    out,
 					Timestamp: timestamppb.Now(),
@@ -158,7 +100,7 @@ func (s *CaptureServer) StartCapture(req *pb.CaptureRequest, stream pb.CaptureSe
 				stream.Send(res)
 				log.Printf("Sent: \n%v", res)
 			case <-ctx.Done():
-				log.Printf("Stream finished.")
+				log.Printf("Packet monitoring stream finished.")
 				wg.Done()
 				return
 			}
@@ -166,20 +108,36 @@ func (s *CaptureServer) StartCapture(req *pb.CaptureRequest, stream pb.CaptureSe
 	}()
 	wg.Wait()
 
-	// Reset pktmon filters, server's currMonitor, and server's pktContextCancel
+	// If timeout reached and printCounters, then send counter table
+	if s.printCounters {
+		res := &pb.CaptureResponse{
+			Result:    pullCounters(),
+			Timestamp: timestamppb.Now(),
+		}
+
+		stream.Send(res)
+		log.Printf("Sent: \n%v", res)
+	}
+
+	// Reset pktmon filters and CaptureServer's fields
 	cancel()
 	resetPktmon(false, true)
-	s.currMonitor = nil
-	s.pktContextCancel = nil
+	resetCaptureContext(s)
 	log.Printf("Packet monitor filters reset.")
 
 	return nil
 }
 
-func (s *CaptureServer) StopCapture(ctx context.Context, req *pb.Empty) (*pb.Empty, error) {
+func (s *CaptureServer) StopCapture(ctx context.Context, req *pb.Empty) (*pb.StopCaptureResponse, error) {
 	fmt.Println("StopCapture function was invoked.")
+	msg := ""
 
 	if s.currMonitor != nil {
+		if s.printCounters {
+			msg = pullCounters()
+			s.printCounters = false
+		}
+
 		s.currMonitor.Process.Kill()
 		s.pktContextCancel()
 		log.Printf("Successfully killed packet capture stream.\n")
@@ -187,7 +145,13 @@ func (s *CaptureServer) StopCapture(ctx context.Context, req *pb.Empty) (*pb.Emp
 		log.Printf("Packet capture stream not found.\n")
 	}
 
-	return req, nil
+	res := &pb.StopCaptureResponse{
+		Result:    msg,
+		Timestamp: timestamppb.Now(),
+	}
+	log.Printf("Sending: \n%v", res)
+
+	return res, nil
 }
 
 func (*HcnServer) GetHCNLogs(ctx context.Context, req *pb.HCNRequest) (*pb.HCNResponse, error) {

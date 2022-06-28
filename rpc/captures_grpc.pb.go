@@ -19,7 +19,7 @@ const _ = grpc.SupportPackageIsVersion7
 // For semantics around ctx use and closing/ending streaming RPCs, please refer to https://pkg.go.dev/google.golang.org/grpc/?tab=doc#ClientConn.NewStream.
 type CaptureServiceClient interface {
 	StartCapture(ctx context.Context, in *CaptureRequest, opts ...grpc.CallOption) (CaptureService_StartCaptureClient, error)
-	StopCapture(ctx context.Context, in *Empty, opts ...grpc.CallOption) (*Empty, error)
+	StopCapture(ctx context.Context, in *Empty, opts ...grpc.CallOption) (*StopCaptureResponse, error)
 }
 
 type captureServiceClient struct {
@@ -62,8 +62,8 @@ func (x *captureServiceStartCaptureClient) Recv() (*CaptureResponse, error) {
 	return m, nil
 }
 
-func (c *captureServiceClient) StopCapture(ctx context.Context, in *Empty, opts ...grpc.CallOption) (*Empty, error) {
-	out := new(Empty)
+func (c *captureServiceClient) StopCapture(ctx context.Context, in *Empty, opts ...grpc.CallOption) (*StopCaptureResponse, error) {
+	out := new(StopCaptureResponse)
 	err := c.cc.Invoke(ctx, "/winspect.captures.CaptureService/StopCapture", in, out, opts...)
 	if err != nil {
 		return nil, err
@@ -76,7 +76,7 @@ func (c *captureServiceClient) StopCapture(ctx context.Context, in *Empty, opts 
 // for forward compatibility
 type CaptureServiceServer interface {
 	StartCapture(*CaptureRequest, CaptureService_StartCaptureServer) error
-	StopCapture(context.Context, *Empty) (*Empty, error)
+	StopCapture(context.Context, *Empty) (*StopCaptureResponse, error)
 	mustEmbedUnimplementedCaptureServiceServer()
 }
 
@@ -87,7 +87,7 @@ type UnimplementedCaptureServiceServer struct {
 func (UnimplementedCaptureServiceServer) StartCapture(*CaptureRequest, CaptureService_StartCaptureServer) error {
 	return status.Errorf(codes.Unimplemented, "method StartCapture not implemented")
 }
-func (UnimplementedCaptureServiceServer) StopCapture(context.Context, *Empty) (*Empty, error) {
+func (UnimplementedCaptureServiceServer) StopCapture(context.Context, *Empty) (*StopCaptureResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method StopCapture not implemented")
 }
 func (UnimplementedCaptureServiceServer) mustEmbedUnimplementedCaptureServiceServer() {}

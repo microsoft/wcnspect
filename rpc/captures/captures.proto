@@ -7,11 +7,22 @@ import "google/protobuf/timestamp.proto";
 
 // models
 message Filters {
-	repeated string pods = 1;
 	repeated string ips = 2;
 	repeated string protocols = 3;
 	repeated string ports = 4;
 	repeated string macs = 5;
+}
+
+message Modifiers {
+	repeated string pods = 1;
+	PacketType packet_type = 4;
+	bool counters_only = 5;
+}
+
+enum PacketType {
+	all = 0;
+	flow = 1;
+	drop = 2;
 }
 
 message Empty {
@@ -22,7 +33,8 @@ message Empty {
 message CaptureRequest {
 	int32 duration = 1;
 	google.protobuf.Timestamp timestamp = 2;
-	Filters filter = 3;
+	Modifiers modifier = 3;
+	Filters filter = 4;
 }
 
 // responses
@@ -31,9 +43,14 @@ message CaptureResponse {
 	google.protobuf.Timestamp timestamp = 2;
 }
 
+message StopCaptureResponse {
+	string result = 1;
+	google.protobuf.Timestamp timestamp = 2;
+}
+
 // service
 service CaptureService {
 	rpc StartCapture(CaptureRequest) returns (stream CaptureResponse) {}
 	
-	rpc StopCapture(Empty) returns (Empty) {}
+	rpc StopCapture(Empty) returns (StopCaptureResponse) {}
 }
