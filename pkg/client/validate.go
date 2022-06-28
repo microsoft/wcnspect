@@ -15,6 +15,7 @@ import (
 )
 
 var validProtocols = strings.Split(common.ValidProtocols, " ")
+var validPktTypes = strings.Split(common.ValidPacketTypes, " ")
 
 func ParseValidateNodes(nodes []string, nodeset []v1.Node) []string {
 	winNodes := k8spi.FilterNodes(nodeset, k8spi.WindowsOS)
@@ -58,7 +59,7 @@ func ParseValidatePods(pods []string, podset []v1.Pod) map[string][]string {
 	return ret
 }
 
-func ValidateCaptureParams(args *CaptureParams) {
+func (args *CaptureParams) ValidateCaptureParams() {
 	if err := ValidateTime(args.Time); err != nil {
 		log.Fatal(err)
 	}
@@ -76,6 +77,10 @@ func ValidateCaptureParams(args *CaptureParams) {
 	}
 
 	if err := ValidateMACAddrs(args.Macs); err != nil {
+		log.Fatal(err)
+	}
+
+	if err := ValidatePktType(args.PacketType); err != nil {
 		log.Fatal(err)
 	}
 }
@@ -98,7 +103,7 @@ func ValidateIPAddrs(ips []string) error {
 
 func ValidateProtocols(protocols []string) error {
 	for _, prot := range protocols {
-		if !comprise.Contains(validProtocols, prot) {
+		if !comprise.Contains(validProtocols, strings.ToUpper(prot)) {
 			return fmt.Errorf("invalid protocol: %s", prot)
 		}
 	}
@@ -121,5 +126,13 @@ func ValidateMACAddrs(macs []string) error {
 			return fmt.Errorf("invalid MAC address format: %v", err)
 		}
 	}
+	return nil
+}
+
+func ValidatePktType(pktType string) error {
+	if !comprise.Contains(validPktTypes, strings.ToUpper(pktType)) {
+		return fmt.Errorf("invalid packet type: %s", pktType)
+	}
+
 	return nil
 }

@@ -15,13 +15,20 @@ import (
 )
 
 type CaptureParams struct {
-	Node      string
-	Pods      []string
-	Ips       []string
-	Protocols []string
-	Ports     []string
-	Macs      []string
-	Time      int32
+	Node         string
+	Pods         []string
+	Ips          []string
+	Protocols    []string
+	Ports        []string
+	Macs         []string
+	Time         int32
+	PacketType   string
+	CountersOnly bool
+}
+
+type CounterParams struct {
+	Node          string
+	IncludeHidden bool
 }
 
 type HCNParams struct {
@@ -37,6 +44,7 @@ type client struct {
 
 func CreateConnection(ip string) (*client, func() error) {
 	//FIXME: hardcoded port addition
+	// also using grpc.WithInsecure, but way smaller priority
 	cc, err := grpc.Dial(ip+":"+common.DefaultServerPort, grpc.WithInsecure())
 	if err != nil {
 		log.Fatalf("could not connect: %v", err)
@@ -57,8 +65,12 @@ func RunCaptureStream(c pb.CaptureServiceClient, args *CaptureParams, wg *sync.W
 	req := &pb.CaptureRequest{
 		Duration:  args.Time,
 		Timestamp: timestamppb.Now(),
+		Modifier: &pb.Modifiers{
+			Pods:         args.Pods,
+			PacketType:   pb.PacketType(pb.PacketType_value[args.PacketType]),
+			CountersOnly: args.CountersOnly,
+		},
 		Filter: &pb.Filters{
-			Pods:      args.Pods,
 			Ips:       args.Ips,
 			Protocols: args.Protocols,
 			Ports:     args.Ports,
@@ -94,12 +106,41 @@ func RunCaptureStream(c pb.CaptureServiceClient, args *CaptureParams, wg *sync.W
 }
 
 func RunStopCapture(c pb.CaptureServiceClient, ip string, wg *sync.WaitGroup) {
-	_, err := c.StopCapture(context.Background(), &pb.Empty{})
+	res, err := c.StopCapture(context.Background(), &pb.Empty{})
 	if err != nil {
 		log.Fatalf("error while calling StopCapture RPC (from IP: %s): %v", ip, err)
 	}
 
-	fmt.Printf("Ended packet capture on IP: %s.\n", ip)
+	msg, timestamp := res.GetResult(), res.GetTimestamp().AsTime()
+	if len(msg) != 0 {
+		fmt.Printf("StopCapture successfully ran on IP: %s at time: %s with output: \n%s\n", ip, timestamp, msg)
+	} else {
+		fmt.Printf("StopCapture successfully ran at time: %s.\n", timestamp)
+	}
+
+	fmt.Printf("Packet capture ended on IP: %s.\n", ip)
+
+	if wg != nil {
+		wg.Done()
+	}
+}
+
+func PrintCounters(c pb.CaptureServiceClient, args *CounterParams, wg *sync.WaitGroup) {
+	ip := args.Node
+	fmt.Printf("Requesting packet counters table (from IP: %s)...\n", ip)
+
+	// Create request object
+	req := &pb.CountersRequest{
+		IncludeHidden: args.IncludeHidden,
+	}
+
+	// Send request
+	res, err := c.GetCounters(context.Background(), req)
+	if err != nil {
+		log.Fatalf("error while calling GetCounters RPC (from IP: %s): %v", ip, err)
+	}
+
+	fmt.Printf("Received GetCounters RPC response (from IP: %s):\n%s\n", ip, res.GetResult())
 
 	if wg != nil {
 		wg.Done()

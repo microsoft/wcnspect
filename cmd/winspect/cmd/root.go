@@ -71,6 +71,9 @@ func init() {
 
 	// Validation
 	targetNodes = client.ParseValidateNodes(targetNodes, nodeSet)
+	if len(targetNodes) == 0 {
+		log.Fatal("no windows nodes exist")
+	}
 }
 
 func Execute() {

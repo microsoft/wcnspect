@@ -12,7 +12,7 @@ import (
 var hnsCmd = &cobra.Command{
 	Use:   "hns",
 	Short: "The 'hns' command will retrieve hns logs on all windows nodes.",
-	Long: `The 'hns' command will run a packet capture on all windows nodes. For example:
+	Long: `The 'hns' command will retrieve hns logs on all windows nodes. For example:
 'winspect hns all --nodes {nodes} --json`,
 }
 
@@ -46,12 +46,12 @@ func init() {
 func getLogs(cmd *cobra.Command, args []string) {
 	nodes, err := cmd.Flags().GetStringSlice("nodes")
 	if err != nil {
-		log.Print(err)
+		log.Fatal(err)
 	}
 
 	verbose, err := cmd.Flags().GetBool("json")
 	if err != nil {
-		log.Print(err)
+		log.Fatal(err)
 	}
 
 	if len(nodes) != 0 {

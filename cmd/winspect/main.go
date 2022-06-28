@@ -1,7 +1,7 @@
 package main
 
 import (
-	"github.com/microsoft/winspect/cmd/client/cmd"
+	"github.com/microsoft/winspect/cmd/winspect/cmd"
 )
 
 func main() {
