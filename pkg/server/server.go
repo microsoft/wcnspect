@@ -154,6 +154,29 @@ func (s *CaptureServer) StopCapture(ctx context.Context, req *pb.Empty) (*pb.Sto
 	return res, nil
 }
 
+func (s *CaptureServer) GetCounters(ctx context.Context, req *pb.CountersRequest) (*pb.CountersResponse, error) {
+	fmt.Println("GetCounters function was invoked.")
+	pktmonCmd := "pktmon counter"
+
+	if req.IncludeHidden {
+		pktmonCmd += " --include-hidden"
+	}
+
+	cmd := exec.Command("cmd", "/c", pktmonCmd)
+
+	out, err := cmd.Output()
+	if err != nil {
+		log.Print(err)
+	}
+
+	res := &pb.CountersResponse{
+		Result: string(out),
+	}
+	log.Printf("Sending: \n%v", res)
+
+	return res, nil
+}
+
 func (*HcnServer) GetHCNLogs(ctx context.Context, req *pb.HCNRequest) (*pb.HCNResponse, error) {
 	hcntype := pb.HCNType(req.GetHcntype())
 	verbose := req.GetVerbose()

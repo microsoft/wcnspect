@@ -37,6 +37,10 @@ message CaptureRequest {
 	Filters filter = 4;
 }
 
+message CountersRequest {
+	bool include_hidden = 1;
+}
+
 // responses
 message CaptureResponse {
 	string result = 1;
@@ -48,9 +52,15 @@ message StopCaptureResponse {
 	google.protobuf.Timestamp timestamp = 2;
 }
 
+message CountersResponse {
+	string result = 1;
+}
+
 // service
 service CaptureService {
 	rpc StartCapture(CaptureRequest) returns (stream CaptureResponse) {}
-	
+
 	rpc StopCapture(Empty) returns (StopCaptureResponse) {}
+
+	rpc GetCounters(CountersRequest) returns (CountersResponse) {}
 }

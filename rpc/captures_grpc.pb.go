@@ -20,6 +20,7 @@ const _ = grpc.SupportPackageIsVersion7
 type CaptureServiceClient interface {
 	StartCapture(ctx context.Context, in *CaptureRequest, opts ...grpc.CallOption) (CaptureService_StartCaptureClient, error)
 	StopCapture(ctx context.Context, in *Empty, opts ...grpc.CallOption) (*StopCaptureResponse, error)
+	GetCounters(ctx context.Context, in *CountersRequest, opts ...grpc.CallOption) (*CountersResponse, error)
 }
 
 type captureServiceClient struct {
@@ -71,12 +72,22 @@ func (c *captureServiceClient) StopCapture(ctx context.Context, in *Empty, opts 
 	return out, nil
 }
 
+func (c *captureServiceClient) GetCounters(ctx context.Context, in *CountersRequest, opts ...grpc.CallOption) (*CountersResponse, error) {
+	out := new(CountersResponse)
+	err := c.cc.Invoke(ctx, "/winspect.captures.CaptureService/GetCounters", in, out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // CaptureServiceServer is the server API for CaptureService service.
 // All implementations must embed UnimplementedCaptureServiceServer
 // for forward compatibility
 type CaptureServiceServer interface {
 	StartCapture(*CaptureRequest, CaptureService_StartCaptureServer) error
 	StopCapture(context.Context, *Empty) (*StopCaptureResponse, error)
+	GetCounters(context.Context, *CountersRequest) (*CountersResponse, error)
 	mustEmbedUnimplementedCaptureServiceServer()
 }
 
@@ -89,6 +100,9 @@ func (UnimplementedCaptureServiceServer) StartCapture(*CaptureRequest, CaptureSe
 }
 func (UnimplementedCaptureServiceServer) StopCapture(context.Context, *Empty) (*StopCaptureResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method StopCapture not implemented")
+}
+func (UnimplementedCaptureServiceServer) GetCounters(context.Context, *CountersRequest) (*CountersResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method GetCounters not implemented")
 }
 func (UnimplementedCaptureServiceServer) mustEmbedUnimplementedCaptureServiceServer() {}
 
@@ -142,6 +156,24 @@ func _CaptureService_StopCapture_Handler(srv interface{}, ctx context.Context, d
 	return interceptor(ctx, in, info, handler)
 }
 
+func _CaptureService_GetCounters_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(CountersRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(CaptureServiceServer).GetCounters(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: "/winspect.captures.CaptureService/GetCounters",
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(CaptureServiceServer).GetCounters(ctx, req.(*CountersRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 // CaptureService_ServiceDesc is the grpc.ServiceDesc for CaptureService service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -152,6 +184,10 @@ var CaptureService_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "StopCapture",
 			Handler:    _CaptureService_StopCapture_Handler,
+		},
+		{
+			MethodName: "GetCounters",
+			Handler:    _CaptureService_GetCounters_Handler,
 		},
 	},
 	Streams: []grpc.StreamDesc{

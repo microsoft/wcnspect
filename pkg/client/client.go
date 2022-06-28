@@ -26,6 +26,11 @@ type CaptureParams struct {
 	CountersOnly bool
 }
 
+type CounterParams struct {
+	Node          string
+	IncludeHidden bool
+}
+
 type HCNParams struct {
 	Cmd     string
 	Node    string
@@ -114,6 +119,28 @@ func RunStopCapture(c pb.CaptureServiceClient, ip string, wg *sync.WaitGroup) {
 	}
 
 	fmt.Printf("Packet capture ended on IP: %s.\n", ip)
+
+	if wg != nil {
+		wg.Done()
+	}
+}
+
+func PrintCounters(c pb.CaptureServiceClient, args *CounterParams, wg *sync.WaitGroup) {
+	ip := args.Node
+	fmt.Printf("Requesting packet counters table (from IP: %s)...\n", ip)
+
+	// Create request object
+	req := &pb.CountersRequest{
+		IncludeHidden: args.IncludeHidden,
+	}
+
+	// Send request
+	res, err := c.GetCounters(context.Background(), req)
+	if err != nil {
+		log.Fatalf("error while calling GetCounters RPC (from IP: %s): %v", ip, err)
+	}
+
+	fmt.Printf("Received GetCounters RPC response (from IP: %s):\n%s\n", ip, res.GetResult())
 
 	if wg != nil {
 		wg.Done()
