@@ -1,4 +1,4 @@
-package nets
+package netutil
 
 import (
 	"bufio"

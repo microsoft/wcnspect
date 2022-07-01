@@ -1,7 +1,8 @@
-package server
+package pkt
 
 import (
 	"bufio"
+	"context"
 	"fmt"
 	"io"
 	"log"
@@ -9,7 +10,7 @@ import (
 	"strings"
 
 	"github.com/microsoft/winspect/pkg/comprise"
-	"github.com/microsoft/winspect/pkg/nets"
+	"github.com/microsoft/winspect/pkg/netutil"
 	pb "github.com/microsoft/winspect/rpc"
 )
 
@@ -20,7 +21,7 @@ var pktParams = map[string]string{
 	"macs":      "-m",
 }
 
-func addPktmonFilters(filters *pb.Filters) {
+func AddFilters(filters *pb.Filters) {
 	protocols := filters.GetProtocols()
 	args := map[string][]string{
 		"ips":   filters.GetIps(),
@@ -66,7 +67,7 @@ func addPktmonFilters(filters *pb.Filters) {
 	}
 }
 
-func pktmonStream(stdout *io.ReadCloser) <-chan string {
+func CreateStreamChannel(stdout *io.ReadCloser) <-chan string {
 	c := make(chan string)
 
 	scanner := bufio.NewScanner(*stdout)
@@ -80,7 +81,28 @@ func pktmonStream(stdout *io.ReadCloser) <-chan string {
 	return c
 }
 
-func pullCounters() string {
+func ModifyCaptureCmd(mods *pb.Modifiers) string {
+	baseCmd := "pktmon start -c -m real-time"
+	pods, pktType, countersOnly := mods.GetPods(), mods.GetPacketType(), mods.GetCountersOnly()
+
+	// Add packet type (all, flow, drop)
+	baseCmd += fmt.Sprintf(" --type %s", pktType)
+
+	// If we have pod IPs, then change the pktmonStartCommand
+	if len(pods) > 0 {
+		podIDs := netutil.GetPodIDs(pods)
+		baseCmd += fmt.Sprintf(" --comp %s", strings.Join(podIDs, " "))
+	}
+
+	// Specify whether cmd is counters only
+	if countersOnly {
+		baseCmd += " --counters-only"
+	}
+
+	return baseCmd
+}
+
+func PullCounters() string {
 	cmd := exec.Command("cmd", "/c", "pktmon stop")
 
 	out, err := cmd.Output()
@@ -91,46 +113,48 @@ func pullCounters() string {
 	return string(out)
 }
 
-func resetCaptureContext(s *CaptureServer) {
-	s.currMonitor = nil
-	s.pktContextCancel = nil
-	s.printCounters = false
+func PullStreamCounters(includeHidden bool) string {
+	pktmonCmd := "pktmon counter"
+
+	if includeHidden {
+		pktmonCmd += " --include-hidden"
+	}
+
+	cmd := exec.Command("cmd", "/c", pktmonCmd)
+
+	out, err := cmd.Output()
+	if err != nil {
+		log.Print(err)
+	}
+
+	return string(out)
 }
 
-func resetPktmon(captures bool, filters bool) error {
-	// Stop pktmon
-	if captures {
-		if err := exec.Command("cmd", "/c", "pktmon stop").Run(); err != nil {
-			log.Printf("Failed to stop pktmon: %v", err)
-		}
+func ResetFilters() {
+	if err := exec.Command("cmd", "/c", "pktmon filter remove").Run(); err != nil {
+		log.Printf("Failed to remove old filters: %v", err)
 	}
-
-	// Clear filters
-	if filters {
-		if err := exec.Command("cmd", "/c", "pktmon filter remove").Run(); err != nil {
-			log.Printf("Failed to remove old filters: %v", err)
-		}
-	}
-
-	return nil
 }
 
-func revisePktmonCommand(mods *pb.Modifiers, cmd string) string {
-	pods, pktType, countersOnly := mods.GetPods(), mods.GetPacketType(), mods.GetCountersOnly()
+func ResetCaptureProgram() {
+	if err := exec.Command("cmd", "/c", "pktmon stop").Run(); err != nil {
+		log.Printf("Failed to stop pktmon: %v", err)
+	}
+}
 
-	// Add packet type (all, flow, drop)
-	cmd += fmt.Sprintf(" --type %s", pktType)
+func StartStream(ctx context.Context, strCmd string) (*exec.Cmd, *io.ReadCloser) {
+	ResetCaptureProgram()
 
-	// If we have pod IPs, then change the pktmonStartCommand
-	if len(pods) > 0 {
-		podIDs := nets.GetPodIDs(pods)
-		cmd += fmt.Sprintf(" --comp %s", strings.Join(podIDs, " "))
+	cmd := exec.CommandContext(ctx, "cmd", "/c", strCmd)
+
+	stdout, err := cmd.StdoutPipe()
+	if err != nil {
+		log.Print(err)
 	}
 
-	// Specify whether cmd is counters only
-	if countersOnly {
-		cmd += " --counters-only"
+	if err := cmd.Start(); err != nil {
+		log.Print(err)
 	}
 
-	return cmd
+	return cmd, &stdout
 }

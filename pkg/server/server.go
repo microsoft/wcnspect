@@ -9,7 +9,8 @@ import (
 	"sync"
 	"time"
 
-	"github.com/microsoft/winspect/pkg/nets"
+	"github.com/microsoft/winspect/pkg/netutil"
+	"github.com/microsoft/winspect/pkg/pkt"
 	pb "github.com/microsoft/winspect/rpc"
 
 	"google.golang.org/protobuf/types/known/timestamppb"
@@ -28,7 +29,6 @@ type HcnServer struct {
 
 func (s *CaptureServer) StartCapture(req *pb.CaptureRequest, stream pb.CaptureService_StartCaptureServer) error {
 	fmt.Printf("StartCapture function was invoked with %v\n", req)
-	pktmonStartCommand := "pktmon start -c -m real-time"
 
 	// Retrieve and format request arguments
 	dur := req.GetDuration()
@@ -42,30 +42,23 @@ func (s *CaptureServer) StartCapture(req *pb.CaptureRequest, stream pb.CaptureSe
 	}
 
 	// Ensure filters are reset and add new ones
-	resetPktmon(true, true)
-	addPktmonFilters(filters)
+	pkt.ResetCaptureProgram()
+	pkt.ResetFilters()
+	pkt.AddFilters(filters)
 
 	// Revise pktmonStartCommand based on Modifiers
-	pktmonStartCommand = revisePktmonCommand(modifiers, pktmonStartCommand)
+	captureCmd := pkt.ModifyCaptureCmd(modifiers)
 
 	// Create a timeout context and set as server's pktmon canceller
 	ctx, cancel := context.WithTimeout(context.Background(), time.Duration(dur)*time.Second)
 	s.pktContextCancel = cancel
 
 	// Execute pktmon command and check for errors, if successful, set as server's currMonitor
-	exec.Command("cmd", "/c", "pktmon stop").Run()
-	cmd := exec.CommandContext(ctx, "cmd", "/c", pktmonStartCommand)
-	stdout, err := cmd.StdoutPipe()
-	if err != nil {
-		log.Print(err)
-	}
-	if err := cmd.Start(); err != nil {
-		log.Print(err)
-	}
+	cmd, stdout := pkt.StartStream(ctx, captureCmd)
 	s.currMonitor = cmd
 
 	// Create a channel to receive pktmon stream from
-	c := pktmonStream(&stdout)
+	c := pkt.CreateStreamChannel(stdout)
 
 	// Goroutine with a timeout constraint and pulling on pktmon channel with scanning loop
 	var wg sync.WaitGroup
@@ -98,7 +91,7 @@ func (s *CaptureServer) StartCapture(req *pb.CaptureRequest, stream pb.CaptureSe
 	// If timeout reached and printCounters, then send counter table
 	if s.printCounters {
 		res := &pb.CaptureResponse{
-			Result:    pullCounters(),
+			Result:    pkt.PullCounters(),
 			Timestamp: timestamppb.Now(),
 		}
 
@@ -108,7 +101,7 @@ func (s *CaptureServer) StartCapture(req *pb.CaptureRequest, stream pb.CaptureSe
 
 	// Reset pktmon filters and CaptureServer's fields
 	cancel()
-	resetPktmon(false, true)
+	pkt.ResetFilters()
 	resetCaptureContext(s)
 	log.Printf("Packet monitor filters reset.")
 
@@ -121,7 +114,7 @@ func (s *CaptureServer) StopCapture(ctx context.Context, req *pb.Empty) (*pb.Sto
 
 	if s.currMonitor != nil {
 		if s.printCounters {
-			msg = pullCounters()
+			msg = pkt.PullCounters()
 			s.printCounters = false
 		}
 
@@ -136,28 +129,17 @@ func (s *CaptureServer) StopCapture(ctx context.Context, req *pb.Empty) (*pb.Sto
 		Result:    msg,
 		Timestamp: timestamppb.Now(),
 	}
-	log.Printf("Sending: \n%v", res)
+	log.Printf("Sending StopCapture execution timestamp: \n%v", res)
 
 	return res, nil
 }
 
 func (s *CaptureServer) GetCounters(ctx context.Context, req *pb.CountersRequest) (*pb.CountersResponse, error) {
 	fmt.Println("GetCounters function was invoked.")
-	pktmonCmd := "pktmon counter"
-
-	if req.IncludeHidden {
-		pktmonCmd += " --include-hidden"
-	}
-
-	cmd := exec.Command("cmd", "/c", pktmonCmd)
-
-	out, err := cmd.Output()
-	if err != nil {
-		log.Print(err)
-	}
+	includeHidden := req.GetIncludeHidden()
 
 	res := &pb.CountersResponse{
-		Result: string(out),
+		Result: pkt.PullStreamCounters(includeHidden),
 	}
 	log.Printf("Sending: \n%v", res)
 
@@ -170,11 +152,17 @@ func (*HcnServer) GetHCNLogs(ctx context.Context, req *pb.HCNRequest) (*pb.HCNRe
 
 	fmt.Printf("GetHCNLogs function was invoked for %s.\n", hcntype)
 
-	logs := nets.GetLogs(hcntype.String(), verbose)
+	logs := netutil.GetLogs(hcntype.String(), verbose)
 	res := &pb.HCNResponse{
 		HcnResult: logs,
 	}
 	log.Printf("Sending: \n%v", res)
 
 	return res, nil
+}
+
+func resetCaptureContext(s *CaptureServer) {
+	s.currMonitor = nil
+	s.pktContextCancel = nil
+	s.printCounters = false
 }
