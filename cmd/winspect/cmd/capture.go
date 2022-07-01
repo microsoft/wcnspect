@@ -27,7 +27,7 @@ func init() {
 	rootCmd.AddCommand(captureCmd)
 
 	captureCmd.PersistentFlags().StringSliceVarP(&captureArgs.Ips, "ips", "i", []string{}, "Match source or destination IP address. CIDR supported.")
-	captureCmd.PersistentFlags().StringSliceVarP(&captureArgs.Protocols, "protocols", "t", []string{}, "Match by transport protocol. Can be TCP, UDP, and/or ICMP).")
+	captureCmd.PersistentFlags().StringSliceVarP(&captureArgs.Protocols, "protocols", "t", []string{}, "Match by transport protocol. Can be TCP, UDP, ICMP, and/or TCP_{tcp flag}.")
 	captureCmd.PersistentFlags().StringSliceVarP(&captureArgs.Ports, "ports", "r", []string{}, "Match source or destination port number.")
 	captureCmd.PersistentFlags().StringSliceVarP(&captureArgs.Macs, "macs", "m", []string{}, "Match source or destination MAC address.")
 	captureCmd.PersistentFlags().Int32VarP(&captureArgs.Time, "time", "d", 0, "Time to run packet capture for (in seconds). Runs indefinitely given 0.")

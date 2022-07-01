@@ -15,13 +15,6 @@ import (
 	"google.golang.org/protobuf/types/known/timestamppb"
 )
 
-var pktParams = map[string]string{
-	"protocols": "-t",
-	"ips":       "-i",
-	"ports":     "-p",
-	"macs":      "-m",
-}
-
 type CaptureServer struct {
 	pb.UnimplementedCaptureServiceServer
 	currMonitor      *exec.Cmd          // Tracks the running pktmon stream
@@ -40,13 +33,7 @@ func (s *CaptureServer) StartCapture(req *pb.CaptureRequest, stream pb.CaptureSe
 	// Retrieve and format request arguments
 	dur := req.GetDuration()
 	modifiers := req.GetModifier()
-	filter := req.GetFilter()
-	filterArgs := map[string][]string{
-		"protocols": filter.GetProtocols(),
-		"ips":       filter.GetIps(),
-		"ports":     filter.GetPorts(),
-		"macs":      filter.GetMacs(),
-	}
+	filters := req.GetFilter()
 	s.printCounters = modifiers.GetCountersOnly()
 
 	// If duration is less than 0, we run for an "infinite" amount of time
@@ -56,7 +43,7 @@ func (s *CaptureServer) StartCapture(req *pb.CaptureRequest, stream pb.CaptureSe
 
 	// Ensure filters are reset and add new ones
 	resetPktmon(true, true)
-	addPktmonFilters(filterArgs)
+	addPktmonFilters(filters)
 
 	// Revise pktmonStartCommand based on Modifiers
 	pktmonStartCommand = revisePktmonCommand(modifiers, pktmonStartCommand)

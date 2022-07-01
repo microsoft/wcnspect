@@ -8,39 +8,67 @@ import (
 	"os/exec"
 	"strings"
 
+	"github.com/microsoft/winspect/pkg/comprise"
 	"github.com/microsoft/winspect/pkg/nets"
 	pb "github.com/microsoft/winspect/rpc"
 )
 
-func addPktmonFilters(args map[string][]string) {
-	// If empty, add an empty protocol since our filtering mechanism depends on there being one
-	if len(args["protocols"]) == 0 {
-		args["protocols"] = append(args["protocols"], "")
+var pktParams = map[string]string{
+	"protocols": "-t",
+	"ips":       "-i",
+	"ports":     "-p",
+	"macs":      "-m",
+}
+
+func addPktmonFilters(filters *pb.Filters) {
+	protocols := filters.GetProtocols()
+	args := map[string][]string{
+		"ips":   filters.GetIps(),
+		"ports": filters.GetPorts(),
+		"macs":  filters.GetMacs(),
 	}
 
-	for _, protocol := range args["protocols"] {
-		name := " winspect" + protocol + " "
-		filters := []string{}
+	// If empty, add an empty protocol since our filtering mechanism depends on there being one
+	if len(protocols) == 0 {
+		protocols = append(protocols, "")
+	}
+
+	// Parse any tcp flags for valid pktmon filter input
+	formatTCPFlags := func(s string) string { return strings.Replace(s, "_", " ", 1) }
+	pktProtocols := comprise.Map(protocols, formatTCPFlags)
+
+	for i, protocol := range protocols {
+		name := "winspect" + strings.ToUpper(protocol)
+		filterBuilder := []string{}
 
 		// Build filter slice
 		for arg, addrs := range args {
-			// Short circuiting conditional for adding protocol(s) if in filter request
-			if len(addrs) > 0 && len(addrs[0]) > 0 {
-				filters = append(filters, pktParams[arg]+" "+strings.Join(addrs, " "))
+			if len(addrs) > 0 {
+				newFilterFlag := pktParams[arg] + " " + strings.Join(addrs, " ")
+				filterBuilder = append(filterBuilder, newFilterFlag)
 			}
 		}
 
-		// If there are no filters, break
-		if len(filters) == 0 {
-			break
+		if len(protocol) > 0 {
+			filterBuilder = append(filterBuilder, pktParams["protocols"]+" "+pktProtocols[i])
 		}
 
-		// Execute filter command
+		// If no filters, continue
+		if len(filterBuilder) == 0 {
+			continue
+		}
+		fmt.Println(filterBuilder) //FIXME:
+
 		fmt.Println("Applying filters...")
-		if err := exec.Command("cmd", "/c", "pktmon filter add"+name+strings.Join(filters, " ")).Run(); err != nil {
-			log.Printf("Failed to add%sfilter: %v", name, err)
+		filter := "pktmon filter add" + " " + name + " " + strings.Join(filterBuilder, " ")
+		if err := exec.Command("cmd", "/c", filter).Run(); err != nil {
+			log.Printf("Failed to add %s filter: %v", name, err)
 		}
 	}
+
+	//FIXME:
+	out, _ := exec.Command("cmd", "/c", "pktmon filter list").Output()
+	fmt.Println(string(out))
 }
 
 func pktmonStream(stdout *io.ReadCloser) <-chan string {

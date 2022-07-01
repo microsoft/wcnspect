@@ -14,7 +14,8 @@ import (
 	v1 "k8s.io/api/core/v1"
 )
 
-var validProtocols = strings.Split(common.ValidProtocols, " ")
+var validTCPFormats = comprise.Map(strings.Split(common.ValidTCPFlags, " "), func(s string) string { return "TCP_" + s })
+var validProtocols = append(strings.Split(common.ValidProtocols, " "), validTCPFormats...)
 var validPktTypes = strings.Split(common.ValidPacketTypes, " ")
 
 func ParseValidateNodes(nodes []string, nodeset []v1.Node) []string {
