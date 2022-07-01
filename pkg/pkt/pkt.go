@@ -5,7 +5,6 @@ import (
 	"context"
 	"fmt"
 	"io"
-	"log"
 	"os/exec"
 	"strings"
 
@@ -21,7 +20,7 @@ var pktParams = map[string]string{
 	"macs":      "-m",
 }
 
-func AddFilters(filters *pb.Filters) {
+func AddFilters(filters *pb.Filters) error {
 	protocols := filters.GetProtocols()
 	args := map[string][]string{
 		"ips":   filters.GetIps(),
@@ -62,9 +61,11 @@ func AddFilters(filters *pb.Filters) {
 		fmt.Println("Applying filters...")
 		filter := "pktmon filter add" + " " + name + " " + strings.Join(filterBuilder, " ")
 		if err := exec.Command("cmd", "/c", filter).Run(); err != nil {
-			log.Printf("Failed to add %s filter: %v", name, err)
+			return fmt.Errorf("failed to add %s filter: %v", name, err)
 		}
 	}
+
+	return nil
 }
 
 func CreateStreamChannel(stdout *io.ReadCloser) <-chan string {
@@ -81,7 +82,7 @@ func CreateStreamChannel(stdout *io.ReadCloser) <-chan string {
 	return c
 }
 
-func ModifyCaptureCmd(mods *pb.Modifiers) string {
+func ModifyCaptureCmd(mods *pb.Modifiers) (string, error) {
 	baseCmd := "pktmon start -c -m real-time"
 	pods, pktType, countersOnly := mods.GetPods(), mods.GetPacketType(), mods.GetCountersOnly()
 
@@ -90,7 +91,12 @@ func ModifyCaptureCmd(mods *pb.Modifiers) string {
 
 	// If we have pod IPs, then change the pktmonStartCommand
 	if len(pods) > 0 {
-		podIDs := netutil.GetPodIDs(pods)
+		podIDs, err := netutil.GetPodIDs(pods)
+
+		if err != nil {
+			return "", err
+		}
+
 		baseCmd += fmt.Sprintf(" --comp %s", strings.Join(podIDs, " "))
 	}
 
@@ -99,21 +105,16 @@ func ModifyCaptureCmd(mods *pb.Modifiers) string {
 		baseCmd += " --counters-only"
 	}
 
-	return baseCmd
+	return baseCmd, nil
 }
 
-func PullCounters() string {
+func PullCounters() (string, error) {
 	cmd := exec.Command("cmd", "/c", "pktmon stop")
-
-	out, err := cmd.Output()
-	if err != nil {
-		log.Print(err)
-	}
-
-	return string(out)
+	out, err := cmd.CombinedOutput()
+	return string(out), err
 }
 
-func PullStreamCounters(includeHidden bool) string {
+func PullStreamCounters(includeHidden bool) (string, error) {
 	pktmonCmd := "pktmon counter"
 
 	if includeHidden {
@@ -121,40 +122,41 @@ func PullStreamCounters(includeHidden bool) string {
 	}
 
 	cmd := exec.Command("cmd", "/c", pktmonCmd)
-
 	out, err := cmd.Output()
-	if err != nil {
-		log.Print(err)
-	}
 
-	return string(out)
+	return string(out), err
 }
 
-func ResetFilters() {
+func ResetFilters() error {
 	if err := exec.Command("cmd", "/c", "pktmon filter remove").Run(); err != nil {
-		log.Printf("Failed to remove old filters: %v", err)
+		return fmt.Errorf("failed to remove old filters: %v", err)
 	}
+
+	return nil
 }
 
-func ResetCaptureProgram() {
+func ResetCaptureProgram() error {
 	if err := exec.Command("cmd", "/c", "pktmon stop").Run(); err != nil {
-		log.Printf("Failed to stop pktmon: %v", err)
+		return fmt.Errorf("failed to stop pktmon: %v", err)
 	}
+
+	return nil
 }
 
-func StartStream(ctx context.Context, strCmd string) (*exec.Cmd, *io.ReadCloser) {
-	ResetCaptureProgram()
+func StartStream(ctx context.Context, strCmd string) (*exec.Cmd, *io.ReadCloser, error) {
+	if err := ResetCaptureProgram(); err != nil {
+		return nil, nil, err
+	}
 
 	cmd := exec.CommandContext(ctx, "cmd", "/c", strCmd)
-
 	stdout, err := cmd.StdoutPipe()
 	if err != nil {
-		log.Print(err)
+		return nil, nil, err
 	}
 
 	if err := cmd.Start(); err != nil {
-		log.Print(err)
+		return nil, nil, err
 	}
 
-	return cmd, &stdout
+	return cmd, &stdout, nil
 }
