@@ -57,7 +57,6 @@ func addPktmonFilters(filters *pb.Filters) {
 		if len(filterBuilder) == 0 {
 			continue
 		}
-		fmt.Println(filterBuilder) //FIXME:
 
 		fmt.Println("Applying filters...")
 		filter := "pktmon filter add" + " " + name + " " + strings.Join(filterBuilder, " ")
@@ -65,10 +64,6 @@ func addPktmonFilters(filters *pb.Filters) {
 			log.Printf("Failed to add %s filter: %v", name, err)
 		}
 	}
-
-	//FIXME:
-	out, _ := exec.Command("cmd", "/c", "pktmon filter list").Output()
-	fmt.Println(string(out))
 }
 
 func pktmonStream(stdout *io.ReadCloser) <-chan string {
