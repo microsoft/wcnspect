@@ -53,8 +53,8 @@ func GetPktmonID(mac string) (string, error) {
 	return "", fmt.Errorf("packet monitor component with MAC:%s not found", mac)
 }
 
-/* Retrieves pktmon component vNic ID for each pod passed
-return string slice of these ids.
+/* Retrieves pktmon component vNic ID for each pod IP passed.
+Returns string slice of these ids.
 */
 func GetPodIDs(pods []string) (ret []string, err error) {
 	var endpoints []hcn.HostComputeEndpoint

@@ -35,7 +35,7 @@ func (s *CaptureServer) StartCapture(req *pb.CaptureRequest, stream pb.CaptureSe
 	filters := req.GetFilter()
 	s.printCounters = modifiers.GetCountersOnly()
 
-	// If duration is less than 0, we run for an "infinite" amount of time
+	// If duration is less than or equal to 0, we run for an "infinite" amount of time
 	if dur <= 0 {
 		dur = math.MaxInt32
 	}
@@ -49,7 +49,7 @@ func (s *CaptureServer) StartCapture(req *pb.CaptureRequest, stream pb.CaptureSe
 		return err
 	}
 
-	if err := pkt.AddFilters(filters); err != nil {
+	if err := pkt.AddFilters(filters, true); err != nil {
 		return err
 	}
 

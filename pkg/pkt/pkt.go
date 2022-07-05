@@ -20,7 +20,7 @@ var pktParams = map[string]string{
 	"macs":      "-m",
 }
 
-func AddFilters(filters *pb.Filters) error {
+func AddFilters(filters *pb.Filters, verbose bool) error {
 	protocols := filters.GetProtocols()
 	args := map[string][]string{
 		"ips":   filters.GetIps(),
@@ -58,7 +58,10 @@ func AddFilters(filters *pb.Filters) error {
 			continue
 		}
 
-		fmt.Println("Applying filters...")
+		if verbose {
+			fmt.Println("Applying filters...")
+		}
+
 		filter := "pktmon filter add" + " " + name + " " + strings.Join(filterBuilder, " ")
 		if err := exec.Command("cmd", "/c", filter).Run(); err != nil {
 			return fmt.Errorf("failed to add %s filter: %v", name, err)
