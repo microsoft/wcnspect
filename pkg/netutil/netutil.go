@@ -20,10 +20,10 @@ func GetEndpoint(endpoints []hcn.HostComputeEndpoint, ip string) (hcn.HostComput
 	return hcn.HostComputeEndpoint{}, fmt.Errorf("endpoint with IP:%s not found", ip)
 }
 
-func GetLogs(option string, json bool) ([]byte, error) {
+func GetLogs(option string, verbose bool) ([]byte, error) {
 	cmd := fmt.Sprintf("hnsdiag list %s", option)
 
-	if json {
+	if verbose {
 		cmd += " -d"
 	}
 

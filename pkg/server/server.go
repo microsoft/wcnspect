@@ -49,7 +49,7 @@ func (s *CaptureServer) StartCapture(req *pb.CaptureRequest, stream pb.CaptureSe
 		return err
 	}
 
-	if err := pkt.AddFilters(filters, true); err != nil {
+	if err := pkt.AddFilters(filters); err != nil {
 		return err
 	}
 
@@ -151,6 +151,7 @@ func (s *CaptureServer) StopCapture(ctx context.Context, req *pb.Empty) (*pb.Sto
 		Result:    msg,
 		Timestamp: timestamppb.Now(),
 	}
+
 	log.Printf("Sending StopCapture execution timestamp: \n%v", res)
 
 	return res, err

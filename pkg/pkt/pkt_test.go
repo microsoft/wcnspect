@@ -41,7 +41,7 @@ func TestAddFilters(t *testing.T) {
 
 	for _, tc := range cases {
 		t.Run(tc.desc, func(t *testing.T) {
-			if err := AddFilters(tc.filters, false); err != nil {
+			if err := AddFilters(tc.filters); err != nil {
 				t.Log("error should be nil -", err)
 				t.Fail()
 			}
