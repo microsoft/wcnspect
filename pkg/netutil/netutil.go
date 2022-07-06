@@ -2,8 +2,10 @@ package netutil
 
 import (
 	"bufio"
+	"encoding/json"
 	"fmt"
 	"os/exec"
+	"regexp"
 	"strings"
 
 	"github.com/Microsoft/hcsshim/hcn"
@@ -17,7 +19,7 @@ func GetEndpoint(endpoints []hcn.HostComputeEndpoint, ip string) (hcn.HostComput
 			}
 		}
 	}
-	return hcn.HostComputeEndpoint{}, fmt.Errorf("endpoint with IP:%s not found", ip)
+	return hcn.HostComputeEndpoint{}, fmt.Errorf("endpoint with IP: %s not found", ip)
 }
 
 func GetLogs(option string, verbose bool) ([]byte, error) {
@@ -28,6 +30,25 @@ func GetLogs(option string, verbose bool) ([]byte, error) {
 	}
 
 	return exec.Command("cmd", "/c", cmd).CombinedOutput()
+}
+
+func GetLogsMaps() ([]map[string]interface{}, error) {
+	var ret []map[string]interface{}
+
+	// Get logs
+	logs, err := GetLogs("all", true)
+	if err != nil {
+		return ret, err
+	}
+
+	// Must modify logs string in order to parse as json
+	re := regexp.MustCompile(`\n{`)
+	temp := "[" + re.ReplaceAllString(string(logs), "\n,{") + "]"
+
+	// Unmarshal into map
+	err = json.Unmarshal([]byte(temp), &ret)
+
+	return ret, err
 }
 
 func GetPktmonID(mac string) (string, error) {
@@ -78,6 +99,56 @@ func GetPodIDs(pods []string) (ret []string, err error) {
 		}
 
 		ret = append(ret, id)
+	}
+
+	return
+}
+
+func GetPortGUID(podIP string) (string, error) {
+	endpoints, err := GetLogsMaps()
+	if err != nil {
+		return "", err
+	}
+
+	for _, m := range endpoints {
+		if m["IpAddress"] == podIP {
+			resources := m["Resources"]
+			if resources == nil {
+				return "", fmt.Errorf("could not find Resources for endpoint with IP: %s", podIP)
+			}
+
+			allocators := m["Allocators"]
+			if allocators == nil {
+				return "", fmt.Errorf("could not find Allocators for endpoint with IP: %s", podIP)
+			}
+
+			guid, ok := m["EndpointPortGUID"].(string)
+
+			if !ok {
+				return "", fmt.Errorf("not a string -> %#v", guid)
+			}
+
+			if guid == "" {
+				return "", fmt.Errorf("PortGUID is empty for endpoint with IP: %s", podIP)
+			}
+
+			return guid, nil
+		}
+	}
+
+	return "", fmt.Errorf("endpoint with IP: %s not found", podIP)
+}
+
+func GetPortGUIDs(pods []string) (ret []string, err error) {
+	var guid string
+
+	for _, pod := range pods {
+		guid, err = GetPortGUID(pod)
+		if err != nil {
+			return
+		}
+
+		ret = append(ret, guid)
 	}
 
 	return
