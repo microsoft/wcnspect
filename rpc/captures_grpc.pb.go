@@ -21,6 +21,7 @@ type CaptureServiceClient interface {
 	StartCapture(ctx context.Context, in *CaptureRequest, opts ...grpc.CallOption) (CaptureService_StartCaptureClient, error)
 	StopCapture(ctx context.Context, in *Empty, opts ...grpc.CallOption) (*StopCaptureResponse, error)
 	GetCounters(ctx context.Context, in *CountersRequest, opts ...grpc.CallOption) (*CountersResponse, error)
+	GetVFPCounters(ctx context.Context, in *VFPCountersRequest, opts ...grpc.CallOption) (*VFPCountersResponse, error)
 }
 
 type captureServiceClient struct {
@@ -81,6 +82,15 @@ func (c *captureServiceClient) GetCounters(ctx context.Context, in *CountersRequ
 	return out, nil
 }
 
+func (c *captureServiceClient) GetVFPCounters(ctx context.Context, in *VFPCountersRequest, opts ...grpc.CallOption) (*VFPCountersResponse, error) {
+	out := new(VFPCountersResponse)
+	err := c.cc.Invoke(ctx, "/winspect.captures.CaptureService/GetVFPCounters", in, out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // CaptureServiceServer is the server API for CaptureService service.
 // All implementations must embed UnimplementedCaptureServiceServer
 // for forward compatibility
@@ -88,6 +98,7 @@ type CaptureServiceServer interface {
 	StartCapture(*CaptureRequest, CaptureService_StartCaptureServer) error
 	StopCapture(context.Context, *Empty) (*StopCaptureResponse, error)
 	GetCounters(context.Context, *CountersRequest) (*CountersResponse, error)
+	GetVFPCounters(context.Context, *VFPCountersRequest) (*VFPCountersResponse, error)
 	mustEmbedUnimplementedCaptureServiceServer()
 }
 
@@ -103,6 +114,9 @@ func (UnimplementedCaptureServiceServer) StopCapture(context.Context, *Empty) (*
 }
 func (UnimplementedCaptureServiceServer) GetCounters(context.Context, *CountersRequest) (*CountersResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method GetCounters not implemented")
+}
+func (UnimplementedCaptureServiceServer) GetVFPCounters(context.Context, *VFPCountersRequest) (*VFPCountersResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method GetVFPCounters not implemented")
 }
 func (UnimplementedCaptureServiceServer) mustEmbedUnimplementedCaptureServiceServer() {}
 
@@ -174,6 +188,24 @@ func _CaptureService_GetCounters_Handler(srv interface{}, ctx context.Context, d
 	return interceptor(ctx, in, info, handler)
 }
 
+func _CaptureService_GetVFPCounters_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(VFPCountersRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(CaptureServiceServer).GetVFPCounters(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: "/winspect.captures.CaptureService/GetVFPCounters",
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(CaptureServiceServer).GetVFPCounters(ctx, req.(*VFPCountersRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 // CaptureService_ServiceDesc is the grpc.ServiceDesc for CaptureService service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -188,6 +220,10 @@ var CaptureService_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "GetCounters",
 			Handler:    _CaptureService_GetCounters_Handler,
+		},
+		{
+			MethodName: "GetVFPCounters",
+			Handler:    _CaptureService_GetVFPCounters_Handler,
 		},
 	},
 	Streams: []grpc.StreamDesc{

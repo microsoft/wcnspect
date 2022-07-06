@@ -140,7 +140,8 @@ func PrintCounters(c pb.CaptureServiceClient, args *CounterParams, wg *sync.Wait
 		log.Fatalf("error while calling GetCounters RPC (from IP: %s): %v", ip, err)
 	}
 
-	fmt.Printf("Received GetCounters RPC response (from IP: %s):\n%s\n", ip, res.GetResult())
+	msg, timestamp := res.GetResult(), res.GetTimestamp().AsTime()
+	fmt.Printf("Received GetCounters RPC response (from IP: %s) at time: %s -\n%s\n", ip, timestamp, msg)
 
 	if wg != nil {
 		wg.Done()

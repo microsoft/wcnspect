@@ -41,6 +41,10 @@ message CountersRequest {
 	bool include_hidden = 1;
 }
 
+message VFPCountersRequest {
+	repeated string pods = 1;
+}
+
 // responses
 message CaptureResponse {
 	string result = 1;
@@ -54,6 +58,12 @@ message StopCaptureResponse {
 
 message CountersResponse {
 	string result = 1;
+	google.protobuf.Timestamp timestamp = 2;
+}
+
+message VFPCountersResponse {
+	string result = 1;
+	google.protobuf.Timestamp timestamp = 2;
 }
 
 // service
@@ -63,4 +73,6 @@ service CaptureService {
 	rpc StopCapture(Empty) returns (StopCaptureResponse) {}
 
 	rpc GetCounters(CountersRequest) returns (CountersResponse) {}
+
+	rpc GetVFPCounters(VFPCountersRequest) returns (VFPCountersResponse) {}
 }

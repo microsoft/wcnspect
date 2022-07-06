@@ -163,7 +163,8 @@ func (s *CaptureServer) GetCounters(ctx context.Context, req *pb.CountersRequest
 
 	counters, err := pkt.PullStreamCounters(includeHidden)
 	res := &pb.CountersResponse{
-		Result: counters,
+		Result:    counters,
+		Timestamp: timestamppb.Now(),
 	}
 
 	log.Printf("Sending: \n%v", res)
