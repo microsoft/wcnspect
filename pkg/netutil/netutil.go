@@ -111,35 +111,41 @@ func GetPortGUID(podIP string) (string, error) {
 	}
 
 	for _, m := range endpoints {
-		if m["IpAddress"] == podIP {
-			resources := m["Resources"]
-			if resources == nil {
+		if m["IPAddress"] == podIP {
+			resources, ok := m["Resources"].(map[string]interface{})
+			if !ok {
 				return "", fmt.Errorf("could not find Resources for endpoint with IP: %s", podIP)
 			}
 
-			allocators := m["Allocators"]
-			if allocators == nil {
+			allocators, ok := resources["Allocators"].([]interface{})
+			if !ok {
 				return "", fmt.Errorf("could not find Allocators for endpoint with IP: %s", podIP)
 			}
 
-			guid, ok := m["EndpointPortGUID"].(string)
+			// Only need first element here, which unfortunately can't be accessed through indexing in this case
+			for _, allocator := range allocators {
+				alloc, _ := allocator.(map[string]interface{})
 
-			if !ok {
-				return "", fmt.Errorf("not a string -> %#v", guid)
+				guid, ok := alloc["EndpointPortGuid"].(string)
+
+				if !ok {
+					return "", fmt.Errorf("not a string -> %T", guid)
+				}
+
+				if guid == "" {
+					return "", fmt.Errorf("PortGUID is empty for endpoint with IP: %s", podIP)
+				}
+
+				return guid, nil
 			}
 
-			if guid == "" {
-				return "", fmt.Errorf("PortGUID is empty for endpoint with IP: %s", podIP)
-			}
-
-			return guid, nil
 		}
 	}
 
 	return "", fmt.Errorf("endpoint with IP: %s not found", podIP)
 }
 
-func GetPortGUIDs(pods []string) (ret []string, err error) {
+func GetPortGUIDs(pods []string) (guids []string, err error) {
 	var guid string
 
 	for _, pod := range pods {
@@ -148,7 +154,7 @@ func GetPortGUIDs(pods []string) (ret []string, err error) {
 			return
 		}
 
-		ret = append(ret, guid)
+		guids = append(guids, guid)
 	}
 
 	return

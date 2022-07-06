@@ -1,8 +1,11 @@
 package cmd
 
 import (
-	"fmt"
+	"log"
+	"sync"
 
+	"github.com/microsoft/winspect/pkg/client"
+	"github.com/microsoft/winspect/pkg/comprise"
 	"github.com/spf13/cobra"
 )
 
@@ -25,5 +28,24 @@ func init() {
 }
 
 func getVFPCounters(cmd *cobra.Command, args []string) {
-	fmt.Println("vfp counters.") //TODO: remove
+	pods, err := cmd.Flags().GetStringSlice("pods")
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	hostMap := client.ParseValidatePods(pods, podSet)
+	targetNodes = comprise.Keys(hostMap)
+
+	var wg sync.WaitGroup
+	for _, ip := range targetNodes {
+		wg.Add(1)
+
+		c, closeClient := client.CreateConnection(ip)
+		defer closeClient()
+
+		params := client.VFPCounterParams{Node: ip, Pods: hostMap[ip]}
+		go client.PrintVFPCounters(c, &params, &wg)
+	}
+
+	wg.Wait()
 }

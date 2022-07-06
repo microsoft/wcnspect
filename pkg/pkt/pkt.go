@@ -130,6 +130,15 @@ func PullStreamCounters(includeHidden bool) (string, error) {
 	return string(out), err
 }
 
+func PullVFPCounters(portGUID string) (string, error) {
+	vfpCmd := fmt.Sprintf("vfpctrl /port %s /get-port-counter", portGUID)
+
+	cmd := exec.Command("cmd", "/c", vfpCmd)
+	out, err := cmd.Output()
+
+	return string(out), err
+}
+
 func ResetFilters() error {
 	if err := exec.Command("cmd", "/c", "pktmon filter remove").Run(); err != nil {
 		return fmt.Errorf("failed to remove old filters: %v", err)

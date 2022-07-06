@@ -172,6 +172,28 @@ func (s *CaptureServer) GetCounters(ctx context.Context, req *pb.CountersRequest
 	return res, err
 }
 
+func (*CaptureServer) GetVFPCounters(ctx context.Context, req *pb.VFPCountersRequest) (*pb.VFPCountersResponse, error) {
+	fmt.Println("GetVFPCounters function was invoked.")
+	pods := req.GetPods()
+
+	guids, err := netutil.GetPortGUIDs(pods)
+	if err != nil {
+		log.Print(err)
+		return &pb.VFPCountersResponse{}, err
+	}
+
+	//TODO: rewrite architecture to only take one pod
+	counters, err := pkt.PullVFPCounters(guids[0])
+	res := &pb.VFPCountersResponse{
+		Result:    counters,
+		Timestamp: timestamppb.Now(),
+	}
+
+	log.Printf("Sending: \n%v", res)
+
+	return res, err
+}
+
 func (*HcnServer) GetHCNLogs(ctx context.Context, req *pb.HCNRequest) (*pb.HCNResponse, error) {
 	hcntype := pb.HCNType(req.GetHcntype())
 	verbose := req.GetVerbose()
