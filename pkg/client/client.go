@@ -33,7 +33,7 @@ type CounterParams struct {
 
 type VFPCounterParams struct {
 	Node string
-	Pods []string
+	Pod  string
 }
 
 type HCNParams struct {
@@ -159,7 +159,7 @@ func PrintVFPCounters(c pb.CaptureServiceClient, args *VFPCounterParams, wg *syn
 
 	// Create request object
 	req := &pb.VFPCountersRequest{
-		Pods: args.Pods,
+		Pod: args.Pod,
 	}
 
 	// Send request

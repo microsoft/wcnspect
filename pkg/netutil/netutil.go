@@ -11,6 +11,21 @@ import (
 	"github.com/Microsoft/hcsshim/hcn"
 )
 
+type HNSDiagObj struct {
+	IPAddress      string           `json:",omitempty"`
+	MacAddress     string           `json:",omitempty"`
+	Resources      HNSDiagResources `json:",omitempty"`
+	VirtualNetwork string           `json:",omitempty"`
+}
+
+type HNSDiagResources struct {
+	Allocators []HNSDiagAllocator `json:",omitempty"`
+}
+
+type HNSDiagAllocator struct {
+	EndpointPortGuid string `json:",omitempty"`
+}
+
 func GetEndpoint(endpoints []hcn.HostComputeEndpoint, ip string) (hcn.HostComputeEndpoint, error) {
 	for _, endpoint := range endpoints {
 		for _, ipconfig := range endpoint.IpConfigurations {
@@ -32,23 +47,23 @@ func GetLogs(option string, verbose bool) ([]byte, error) {
 	return exec.Command("cmd", "/c", cmd).CombinedOutput()
 }
 
-func GetLogsMaps() ([]map[string]interface{}, error) {
-	var ret []map[string]interface{}
+func ParseLogs() ([]HNSDiagObj, error) {
+	var hnsObjs []HNSDiagObj
 
 	// Get logs
-	logs, err := GetLogs("all", true)
+	logs, err := GetLogs("all", true) //TODO: restrict to just endpoints?
 	if err != nil {
-		return ret, err
+		return hnsObjs, err
 	}
 
 	// Must modify logs string in order to parse as json
 	re := regexp.MustCompile(`\n{`)
 	temp := "[" + re.ReplaceAllString(string(logs), "\n,{") + "]"
 
-	// Unmarshal into map
-	err = json.Unmarshal([]byte(temp), &ret)
+	// Unmarshal into struct
+	err = json.Unmarshal([]byte(temp), &hnsObjs)
 
-	return ret, err
+	return hnsObjs, err
 }
 
 func GetPktmonID(mac string) (string, error) {
@@ -105,57 +120,16 @@ func GetPodIDs(pods []string) (ret []string, err error) {
 }
 
 func GetPortGUID(podIP string) (string, error) {
-	endpoints, err := GetLogsMaps()
+	objs, err := ParseLogs()
 	if err != nil {
 		return "", err
 	}
 
-	for _, m := range endpoints {
-		if m["IPAddress"] == podIP {
-			resources, ok := m["Resources"].(map[string]interface{})
-			if !ok {
-				return "", fmt.Errorf("could not find Resources for endpoint with IP: %s", podIP)
-			}
-
-			allocators, ok := resources["Allocators"].([]interface{})
-			if !ok {
-				return "", fmt.Errorf("could not find Allocators for endpoint with IP: %s", podIP)
-			}
-
-			// Only need first element here, which unfortunately can't be accessed through indexing in this case
-			for _, allocator := range allocators {
-				alloc, _ := allocator.(map[string]interface{})
-
-				guid, ok := alloc["EndpointPortGuid"].(string)
-
-				if !ok {
-					return "", fmt.Errorf("not a string -> %T", guid)
-				}
-
-				if guid == "" {
-					return "", fmt.Errorf("PortGUID is empty for endpoint with IP: %s", podIP)
-				}
-
-				return guid, nil
-			}
-
+	for _, obj := range objs {
+		if obj.IPAddress == podIP {
+			return obj.Resources.Allocators[0].EndpointPortGuid, nil
 		}
 	}
 
 	return "", fmt.Errorf("endpoint with IP: %s not found", podIP)
-}
-
-func GetPortGUIDs(pods []string) (guids []string, err error) {
-	var guid string
-
-	for _, pod := range pods {
-		guid, err = GetPortGUID(pod)
-		if err != nil {
-			return
-		}
-
-		guids = append(guids, guid)
-	}
-
-	return
 }

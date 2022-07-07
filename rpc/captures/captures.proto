@@ -42,7 +42,7 @@ message CountersRequest {
 }
 
 message VFPCountersRequest {
-	repeated string pods = 1;
+	string pod = 1;
 }
 
 // responses

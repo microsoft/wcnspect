@@ -174,16 +174,15 @@ func (s *CaptureServer) GetCounters(ctx context.Context, req *pb.CountersRequest
 
 func (*CaptureServer) GetVFPCounters(ctx context.Context, req *pb.VFPCountersRequest) (*pb.VFPCountersResponse, error) {
 	fmt.Println("GetVFPCounters function was invoked.")
-	pods := req.GetPods()
+	pod := req.GetPod()
 
-	guids, err := netutil.GetPortGUIDs(pods)
+	guid, err := netutil.GetPortGUID(pod)
 	if err != nil {
 		log.Print(err)
 		return &pb.VFPCountersResponse{}, err
 	}
 
-	//TODO: rewrite architecture to only take one pod
-	counters, err := pkt.PullVFPCounters(guids[0])
+	counters, err := pkt.PullVFPCounters(guid)
 	res := &pb.VFPCountersResponse{
 		Result:    counters,
 		Timestamp: timestamppb.Now(),
