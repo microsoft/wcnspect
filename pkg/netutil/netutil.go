@@ -3,7 +3,6 @@ package netutil
 import (
 	"bufio"
 	"fmt"
-	"log"
 	"os/exec"
 	"strings"
 
@@ -18,27 +17,23 @@ func GetEndpoint(endpoints []hcn.HostComputeEndpoint, ip string) (hcn.HostComput
 			}
 		}
 	}
-	return hcn.HostComputeEndpoint{}, fmt.Errorf("Endpoint with IP:%s not found", ip)
+	return hcn.HostComputeEndpoint{}, fmt.Errorf("endpoint with IP:%s not found", ip)
 }
 
-func GetLogs(option string, json bool) []byte {
+func GetLogs(option string, verbose bool) ([]byte, error) {
 	cmd := fmt.Sprintf("hnsdiag list %s", option)
-	if json {
+
+	if verbose {
 		cmd += " -d"
 	}
 
-	out, err := exec.Command("cmd", "/c", cmd).Output()
-	if err != nil {
-		log.Fatalf("Failed to run '%s': %v", cmd, err)
-	}
-
-	return out
+	return exec.Command("cmd", "/c", cmd).CombinedOutput()
 }
 
 func GetPktmonID(mac string) (string, error) {
 	out, err := exec.Command("cmd", "/c", "pktmon list").Output()
 	if err != nil {
-		log.Fatalf("Failed to run 'pktmon list': %v", err)
+		return "", fmt.Errorf("failed to run 'pktmon list': %v", err)
 	}
 
 	scanner := bufio.NewScanner(strings.NewReader(string(out)))
@@ -48,34 +43,38 @@ func GetPktmonID(mac string) (string, error) {
 
 		if len(fields) > 2 && fields[1] == mac {
 			if scanner.Err() != nil {
-				log.Print(err)
+				return "", err
 			}
 
 			return fields[0], nil
 		}
 	}
 
-	return "", fmt.Errorf("Packet Monitor component with MAC:%s not found", mac)
+	return "", fmt.Errorf("packet monitor component with MAC:%s not found", mac)
 }
 
-/* Retrieves pktmon component vNic ID for each pod passed
-return string slice of these ids.
+/* Retrieves pktmon component vNic ID for each pod IP passed.
+Returns string slice of these ids.
 */
-func GetPodIDs(pods []string) (ret []string) {
-	endpoints, err := hcn.ListEndpoints()
+func GetPodIDs(pods []string) (ret []string, err error) {
+	var endpoints []hcn.HostComputeEndpoint
+	var endpoint hcn.HostComputeEndpoint
+	var id string
+
+	endpoints, err = hcn.ListEndpoints()
 	if err != nil {
-		log.Fatal(err)
+		return
 	}
 
 	for _, pod := range pods {
-		endpoint, err := GetEndpoint(endpoints, pod)
+		endpoint, err = GetEndpoint(endpoints, pod)
 		if err != nil {
-			log.Fatal(err)
+			return
 		}
 
-		id, err := GetPktmonID(endpoint.MacAddress)
+		id, err = GetPktmonID(endpoint.MacAddress)
 		if err != nil {
-			log.Fatal(err)
+			return
 		}
 
 		ret = append(ret, id)
