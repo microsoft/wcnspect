@@ -10,6 +10,7 @@ import (
 
 	"github.com/microsoft/winspect/pkg/netutil"
 	"github.com/microsoft/winspect/pkg/pkt"
+	"github.com/microsoft/winspect/pkg/vfputil"
 	pb "github.com/microsoft/winspect/rpc"
 
 	"google.golang.org/protobuf/types/known/timestamppb"
@@ -163,7 +164,29 @@ func (s *CaptureServer) GetCounters(ctx context.Context, req *pb.CountersRequest
 
 	counters, err := pkt.PullStreamCounters(includeHidden)
 	res := &pb.CountersResponse{
-		Result: counters,
+		Result:    counters,
+		Timestamp: timestamppb.Now(),
+	}
+
+	log.Printf("Sending: \n%v", res)
+
+	return res, err
+}
+
+func (*CaptureServer) GetVFPCounters(ctx context.Context, req *pb.VFPCountersRequest) (*pb.VFPCountersResponse, error) {
+	fmt.Println("GetVFPCounters function was invoked.")
+	pod := req.GetPod()
+
+	guid, err := vfputil.GetPodPortGUID(pod)
+	if err != nil {
+		log.Print(err)
+		return &pb.VFPCountersResponse{}, err
+	}
+
+	counters, err := vfputil.PullVFPCounters(guid)
+	res := &pb.VFPCountersResponse{
+		Result:    counters,
+		Timestamp: timestamppb.Now(),
 	}
 
 	log.Printf("Sending: \n%v", res)

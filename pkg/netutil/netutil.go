@@ -2,12 +2,29 @@ package netutil
 
 import (
 	"bufio"
+	"encoding/json"
 	"fmt"
 	"os/exec"
+	"regexp"
 	"strings"
 
 	"github.com/Microsoft/hcsshim/hcn"
 )
+
+type HNSDiagObj struct {
+	IPAddress      string           `json:",omitempty"`
+	MacAddress     string           `json:",omitempty"`
+	Resources      HNSDiagResources `json:",omitempty"`
+	VirtualNetwork string           `json:",omitempty"`
+}
+
+type HNSDiagResources struct {
+	Allocators []HNSDiagAllocator `json:",omitempty"`
+}
+
+type HNSDiagAllocator struct {
+	EndpointPortGuid string `json:",omitempty"`
+}
 
 func GetEndpoint(endpoints []hcn.HostComputeEndpoint, ip string) (hcn.HostComputeEndpoint, error) {
 	for _, endpoint := range endpoints {
@@ -17,7 +34,7 @@ func GetEndpoint(endpoints []hcn.HostComputeEndpoint, ip string) (hcn.HostComput
 			}
 		}
 	}
-	return hcn.HostComputeEndpoint{}, fmt.Errorf("endpoint with IP:%s not found", ip)
+	return hcn.HostComputeEndpoint{}, fmt.Errorf("endpoint with IP: %s not found", ip)
 }
 
 func GetLogs(option string, verbose bool) ([]byte, error) {
@@ -81,4 +98,24 @@ func GetPodIDs(pods []string) (ret []string, err error) {
 	}
 
 	return
+}
+
+func ParseLogs() ([]HNSDiagObj, error) {
+	var hnsObjs []HNSDiagObj
+
+	// Get logs
+	bytelogs, err := GetLogs("endpoints", true)
+	if err != nil {
+		return hnsObjs, err
+	}
+	logs := string(bytelogs)
+
+	// Must modify logs string in order to parse as json
+	re := regexp.MustCompile(`\n{`)
+	logs = "[" + re.ReplaceAllString(logs, "\n,{") + "]"
+
+	// Unmarshal into struct
+	err = json.Unmarshal([]byte(logs), &hnsObjs)
+
+	return hnsObjs, err
 }

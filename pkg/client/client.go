@@ -31,6 +31,11 @@ type CounterParams struct {
 	IncludeHidden bool
 }
 
+type VFPCounterParams struct {
+	Node string
+	Pod  string
+}
+
 type HCNParams struct {
 	Cmd     string
 	Node    string
@@ -140,7 +145,31 @@ func PrintCounters(c pb.CaptureServiceClient, args *CounterParams, wg *sync.Wait
 		log.Fatalf("error while calling GetCounters RPC (from IP: %s): %v", ip, err)
 	}
 
-	fmt.Printf("Received GetCounters RPC response (from IP: %s):\n%s\n", ip, res.GetResult())
+	msg, timestamp := res.GetResult(), res.GetTimestamp().AsTime()
+	fmt.Printf("Received GetCounters RPC response (from IP: %s) at time: %s -\n%s\n", ip, timestamp, msg)
+
+	if wg != nil {
+		wg.Done()
+	}
+}
+
+func PrintVFPCounters(c pb.CaptureServiceClient, args *VFPCounterParams, wg *sync.WaitGroup) {
+	ip := args.Node
+	fmt.Printf("Requesting VFP packet counters table (from IP: %s)...\n", ip)
+
+	// Create request object
+	req := &pb.VFPCountersRequest{
+		Pod: args.Pod,
+	}
+
+	// Send request
+	res, err := c.GetVFPCounters(context.Background(), req)
+	if err != nil {
+		log.Fatalf("error while calling GetVFPCounters RPC (from IP: %s): %v", ip, err)
+	}
+
+	msg, timestamp := res.GetResult(), res.GetTimestamp().AsTime()
+	fmt.Printf("Received GetVFPCounters RPC response (from IP: %s) at time: %s -\n%s\n", ip, timestamp, msg)
 
 	if wg != nil {
 		wg.Done()

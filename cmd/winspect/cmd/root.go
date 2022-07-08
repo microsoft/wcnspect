@@ -74,7 +74,7 @@ func init() {
 	if len(targetNodes) == 0 {
 		log.Fatal("no windows nodes exist")
 	}
-	targetNodes = []string{"localhost"} //FIXME:
+	// targetNodes = []string{"localhost"} //FIXME:
 }
 
 func Execute() {
