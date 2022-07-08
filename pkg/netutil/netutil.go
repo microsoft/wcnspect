@@ -60,6 +60,8 @@ func ParseLogs() ([]HNSDiagObj, error) {
 	re := regexp.MustCompile(`\n{`)
 	temp := "[" + re.ReplaceAllString(string(logs), "\n,{") + "]"
 
+	fmt.Println(temp)
+
 	// Unmarshal into struct
 	err = json.Unmarshal([]byte(temp), &hnsObjs)
 
@@ -127,7 +129,17 @@ func GetPortGUID(podIP string) (string, error) {
 
 	for _, obj := range objs {
 		if obj.IPAddress == podIP {
-			return obj.Resources.Allocators[0].EndpointPortGuid, nil
+			allocators := obj.Resources.Allocators
+			if len(allocators) == 0 {
+				return "", fmt.Errorf("could not find Allocators for endpoint with IP: %s", podIP)
+			}
+
+			guid := allocators[0].EndpointPortGuid
+			if guid == "" {
+				return "", fmt.Errorf("PortGUID is empty for endpoint with IP: %s", podIP)
+			}
+
+			return allocators[0].EndpointPortGuid, nil
 		}
 	}
 
