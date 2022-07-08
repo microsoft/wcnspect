@@ -10,6 +10,7 @@ import (
 
 	"github.com/microsoft/winspect/pkg/netutil"
 	"github.com/microsoft/winspect/pkg/pkt"
+	"github.com/microsoft/winspect/pkg/vfputil"
 	pb "github.com/microsoft/winspect/rpc"
 
 	"google.golang.org/protobuf/types/known/timestamppb"
@@ -176,13 +177,13 @@ func (*CaptureServer) GetVFPCounters(ctx context.Context, req *pb.VFPCountersReq
 	fmt.Println("GetVFPCounters function was invoked.")
 	pod := req.GetPod()
 
-	guid, err := netutil.GetPortGUID(pod)
+	guid, err := vfputil.GetPodPortGUID(pod)
 	if err != nil {
 		log.Print(err)
 		return &pb.VFPCountersResponse{}, err
 	}
 
-	counters, err := pkt.PullVFPCounters(guid)
+	counters, err := vfputil.PullVFPCounters(guid)
 	res := &pb.VFPCountersResponse{
 		Result:    counters,
 		Timestamp: timestamppb.Now(),

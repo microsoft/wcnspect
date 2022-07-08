@@ -14,7 +14,7 @@ var vfpcounterCmd = &cobra.Command{
 	Short: "The 'vfp-counter' command will retrieve packet counter tables from a specified windows pod's vNic's VFP.",
 	Long: `The 'vfp-counter' command will retrieve packet counter tables from a specified windows pod's vNic's VFP. 
 For example:
-'winspect vfp-counter --pod {pod}`,
+'winspect vfp-counter --pod {pod}'`,
 	Run: getVFPCounters,
 }
 

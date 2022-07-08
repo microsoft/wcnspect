@@ -47,27 +47,6 @@ func GetLogs(option string, verbose bool) ([]byte, error) {
 	return exec.Command("cmd", "/c", cmd).CombinedOutput()
 }
 
-func ParseLogs() ([]HNSDiagObj, error) {
-	var hnsObjs []HNSDiagObj
-
-	// Get logs
-	logs, err := GetLogs("all", true) //TODO: restrict to just endpoints?
-	if err != nil {
-		return hnsObjs, err
-	}
-
-	// Must modify logs string in order to parse as json
-	re := regexp.MustCompile(`\n{`)
-	temp := "[" + re.ReplaceAllString(string(logs), "\n,{") + "]"
-
-	fmt.Println(temp)
-
-	// Unmarshal into struct
-	err = json.Unmarshal([]byte(temp), &hnsObjs)
-
-	return hnsObjs, err
-}
-
 func GetPktmonID(mac string) (string, error) {
 	out, err := exec.Command("cmd", "/c", "pktmon list").Output()
 	if err != nil {
@@ -121,27 +100,22 @@ func GetPodIDs(pods []string) (ret []string, err error) {
 	return
 }
 
-func GetPortGUID(podIP string) (string, error) {
-	objs, err := ParseLogs()
+func ParseLogs() ([]HNSDiagObj, error) {
+	var hnsObjs []HNSDiagObj
+
+	// Get logs
+	bytelogs, err := GetLogs("endpoints", true)
 	if err != nil {
-		return "", err
+		return hnsObjs, err
 	}
+	logs := string(bytelogs)
 
-	for _, obj := range objs {
-		if obj.IPAddress == podIP {
-			allocators := obj.Resources.Allocators
-			if len(allocators) == 0 {
-				return "", fmt.Errorf("could not find Allocators for endpoint with IP: %s", podIP)
-			}
+	// Must modify logs string in order to parse as json
+	re := regexp.MustCompile(`\n{`)
+	logs = "[" + re.ReplaceAllString(logs, "\n,{") + "]"
 
-			guid := allocators[0].EndpointPortGuid
-			if guid == "" {
-				return "", fmt.Errorf("PortGUID is empty for endpoint with IP: %s", podIP)
-			}
+	// Unmarshal into struct
+	err = json.Unmarshal([]byte(logs), &hnsObjs)
 
-			return allocators[0].EndpointPortGuid, nil
-		}
-	}
-
-	return "", fmt.Errorf("endpoint with IP: %s not found", podIP)
+	return hnsObjs, err
 }
