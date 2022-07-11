@@ -175,9 +175,9 @@ func (s *CaptureServer) GetCounters(ctx context.Context, req *pb.CountersRequest
 
 func (*CaptureServer) GetVFPCounters(ctx context.Context, req *pb.VFPCountersRequest) (*pb.VFPCountersResponse, error) {
 	fmt.Println("GetVFPCounters function was invoked.")
-	pod := req.GetPod()
+	pod, verbose := req.GetPod(), req.GetVerbose()
 
-	counters, err := vfputil.CollateCounters(pod, true)
+	counters, err := vfputil.CollateCounters(pod, verbose)
 	res := &pb.VFPCountersResponse{
 		Result:    counters,
 		Timestamp: timestamppb.Now(),
@@ -189,8 +189,7 @@ func (*CaptureServer) GetVFPCounters(ctx context.Context, req *pb.VFPCountersReq
 }
 
 func (*HcnServer) GetHCNLogs(ctx context.Context, req *pb.HCNRequest) (*pb.HCNResponse, error) {
-	hcntype := pb.HCNType(req.GetHcntype())
-	verbose := req.GetVerbose()
+	hcntype, verbose := pb.HCNType(req.GetHcntype()), req.GetVerbose()
 
 	fmt.Printf("GetHCNLogs function was invoked for %s.\n", hcntype)
 
@@ -198,6 +197,7 @@ func (*HcnServer) GetHCNLogs(ctx context.Context, req *pb.HCNRequest) (*pb.HCNRe
 	res := &pb.HCNResponse{
 		HcnResult: logs,
 	}
+
 	log.Printf("Sending: \n%v", res)
 
 	return res, err

@@ -43,6 +43,7 @@ message CountersRequest {
 
 message VFPCountersRequest {
 	string pod = 1;
+	bool verbose = 2;
 }
 
 // responses

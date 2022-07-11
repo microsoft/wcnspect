@@ -39,16 +39,20 @@ func CollateCounters(pod string, verbose bool) (string, error) {
 		)
 	}
 
+	collated.WriteString("\n")
 	for i, guid := range guids {
 		counters, err := PullVFPCounters(guid)
 		if err != nil {
 			return collated.String(), err
 		}
 
-		collated.WriteString("\n\n\n")
 		collated.WriteString(titles[i])
 		collated.WriteString(delim)
 		collated.WriteString(counters)
+
+		if len(guids)-1 != i {
+			collated.WriteString("\n\n")
+		}
 	}
 
 	return collated.String(), nil
