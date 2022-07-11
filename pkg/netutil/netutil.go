@@ -12,6 +12,15 @@ import (
 )
 
 type HNSDiagObj struct {
+	HNSDiagEndpoint
+	HNSDiagNetwork
+}
+
+type HNSDiagNetwork struct {
+	ManagementIP string `json:",omitempty"`
+}
+
+type HNSDiagEndpoint struct {
 	IPAddress      string           `json:",omitempty"`
 	MacAddress     string           `json:",omitempty"`
 	Resources      HNSDiagResources `json:",omitempty"`
@@ -100,11 +109,15 @@ func GetPodIDs(pods []string) (ret []string, err error) {
 	return
 }
 
-func ParseLogs() ([]HNSDiagObj, error) {
+func ListIPConfig() ([]byte, error) {
+	return exec.Command("cmd", "/c", "ipconfig /all").CombinedOutput()
+}
+
+func ParseHNSDiag(hnsType string) ([]HNSDiagObj, error) {
 	var hnsObjs []HNSDiagObj
 
 	// Get logs
-	bytelogs, err := GetLogs("endpoints", true)
+	bytelogs, err := GetLogs(hnsType, true)
 	if err != nil {
 		return hnsObjs, err
 	}

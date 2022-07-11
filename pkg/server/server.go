@@ -177,13 +177,7 @@ func (*CaptureServer) GetVFPCounters(ctx context.Context, req *pb.VFPCountersReq
 	fmt.Println("GetVFPCounters function was invoked.")
 	pod := req.GetPod()
 
-	guid, err := vfputil.GetPodPortGUID(pod)
-	if err != nil {
-		log.Print(err)
-		return &pb.VFPCountersResponse{}, err
-	}
-
-	counters, err := vfputil.PullVFPCounters(guid)
+	counters, err := vfputil.CollateCounters(pod, true)
 	res := &pb.VFPCountersResponse{
 		Result:    counters,
 		Timestamp: timestamppb.Now(),
