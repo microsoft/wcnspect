@@ -14,33 +14,14 @@ import (
 	"google.golang.org/protobuf/types/known/timestamppb"
 )
 
-type CaptureParams struct {
-	Node         string
-	Pods         []string
-	Ips          []string
-	Protocols    []string
-	Ports        []string
-	Macs         []string
-	Time         int32
-	PacketType   string
-	CountersOnly bool
+type Node struct {
+	Name string
+	Ip   string
 }
 
-type CounterParams struct {
-	Node          string
-	IncludeHidden bool
-}
-
-type VFPCounterParams struct {
-	Node    string
-	Pod     string
-	Verbose bool
-}
-
-type HCNParams struct {
-	Cmd     string
-	Node    string
-	Verbose bool
+type ReqContext struct {
+	Server Node
+	Wg     *sync.WaitGroup
 }
 
 type client struct {
@@ -63,31 +44,17 @@ func CreateConnection(ip string) (*client, func() error) {
 	return c, cc.Close
 }
 
-func RunCaptureStream(c pb.CaptureServiceClient, args *CaptureParams, wg *sync.WaitGroup) {
-	ip := args.Node
-	fmt.Printf("Starting to do a Server Streaming RPC (from IP: %s)...\n", ip)
+func RunCaptureStream(c pb.CaptureServiceClient, req *pb.CaptureRequest, reqCtx *ReqContext) {
+	name, ip := reqCtx.Server.Name, reqCtx.Server.Ip
+	fmt.Printf("Starting to do a Server Streaming RPC from %s (IP: %s)...\n", name, ip)
 
 	// Create request object
-	req := &pb.CaptureRequest{
-		Duration:  args.Time,
-		Timestamp: timestamppb.Now(),
-		Modifier: &pb.Modifiers{
-			Pods:         args.Pods,
-			PacketType:   pb.PacketType(pb.PacketType_value[args.PacketType]),
-			CountersOnly: args.CountersOnly,
-		},
-		Filter: &pb.Filters{
-			Ips:       args.Ips,
-			Protocols: args.Protocols,
-			Ports:     args.Ports,
-			Macs:      args.Macs,
-		},
-	}
+	req.Timestamp = timestamppb.Now()
 
 	// Send request
 	resStream, err := c.StartCapture(context.Background(), req)
 	if err != nil {
-		log.Fatalf("error while calling StartCapture RPC (from IP: %s): %v", ip, err)
+		log.Fatalf("error while calling StartCapture RPC from %s (from IP: %s): %v", name, ip, err)
 	}
 
 	for {
@@ -98,16 +65,16 @@ func RunCaptureStream(c pb.CaptureServiceClient, args *CaptureParams, wg *sync.W
 		}
 
 		if err != nil {
-			log.Fatalf("error while reading stream (from IP: %s): %v", ip, err)
+			log.Fatalf("error while reading stream from %s (from IP: %s): %v", name, ip, err)
 		}
 
-		fmt.Printf("Response from StartCapture (%s) sent at %s: \n%v\n", ip, msg.GetTimestamp().AsTime(), msg.GetResult())
+		fmt.Printf("Response from %s StartCapture (%s) sent at %s: \n%v\n", name, ip, msg.GetTimestamp().AsTime(), msg.GetResult())
 	}
 
-	fmt.Printf("Finished receiving stream from IP: %s.\n", ip)
+	fmt.Printf("Finished receiving stream from %s (IP: %s).\n", name, ip)
 
-	if wg != nil {
-		wg.Done()
+	if reqCtx.Wg != nil {
+		reqCtx.Wg.Done()
 	}
 }
 
@@ -131,73 +98,56 @@ func RunStopCapture(c pb.CaptureServiceClient, ip string, wg *sync.WaitGroup) {
 	}
 }
 
-func PrintCounters(c pb.CaptureServiceClient, args *CounterParams, wg *sync.WaitGroup) {
-	ip := args.Node
-	fmt.Printf("Requesting packet counters table (from IP: %s)...\n", ip)
-
-	// Create request object
-	req := &pb.CountersRequest{
-		IncludeHidden: args.IncludeHidden,
-	}
+func PrintCounters(c pb.CaptureServiceClient, req *pb.CountersRequest, reqCtx *ReqContext) {
+	name, ip := reqCtx.Server.Name, reqCtx.Server.Ip
+	fmt.Printf("Requesting packet counters table from %s (IP: %s)...\n", name, ip)
 
 	// Send request
 	res, err := c.GetCounters(context.Background(), req)
 	if err != nil {
-		log.Fatalf("error while calling GetCounters RPC (from IP: %s): %v", ip, err)
+		log.Fatalf("error while calling GetCounters RPC from %s (IP: %s): %v", name, ip, err)
 	}
 
 	msg, timestamp := res.GetResult(), res.GetTimestamp().AsTime()
-	fmt.Printf("Received GetCounters RPC response (from IP: %s) at time: %s -\n%s\n", ip, timestamp, msg)
+	fmt.Printf("Received GetCounters RPC response from %s (IP: %s) at time: %s -\n%s\n", name, ip, timestamp, msg)
 
-	if wg != nil {
-		wg.Done()
+	if reqCtx.Wg != nil {
+		reqCtx.Wg.Done()
 	}
 }
 
-func PrintVFPCounters(c pb.CaptureServiceClient, args *VFPCounterParams, wg *sync.WaitGroup) {
-	ip := args.Node
-	fmt.Printf("Requesting VFP packet counters table (from IP: %s)...\n", ip)
-
-	// Create request object
-	req := &pb.VFPCountersRequest{
-		Pod:     args.Pod,
-		Verbose: args.Verbose,
-	}
+func PrintVFPCounters(c pb.CaptureServiceClient, req *pb.VFPCountersRequest, reqCtx *ReqContext) {
+	name, ip := reqCtx.Server.Name, reqCtx.Server.Ip
+	fmt.Printf("Requesting VFP packet counters table from %s (IP: %s)...\n", name, ip)
 
 	// Send request
 	res, err := c.GetVFPCounters(context.Background(), req)
 	if err != nil {
-		log.Fatalf("error while calling GetVFPCounters RPC (from IP: %s): %v", ip, err)
+		log.Fatalf("error while calling GetVFPCounters RPC from %s (IP: %s): %v", name, ip, err)
 	}
 
 	msg, timestamp := res.GetResult(), res.GetTimestamp().AsTime()
-	fmt.Printf("Received GetVFPCounters RPC response (from IP: %s) at time: %s -\n%s\n", ip, timestamp, msg)
+	fmt.Printf("Received GetVFPCounters RPC response from %s (IP: %s) at time: %s -\n%s\n", name, ip, timestamp, msg)
 
-	if wg != nil {
-		wg.Done()
+	if reqCtx.Wg != nil {
+		reqCtx.Wg.Done()
 	}
 }
 
-func PrintHCNLogs(c pb.HCNServiceClient, args *HCNParams, wg *sync.WaitGroup) {
-	hcntype, ip := args.Cmd, args.Node
-	fmt.Printf("Requesting HCN logs (from IP: %s)...\n", ip)
-
-	// Create request object
-	req := &pb.HCNRequest{
-		Hcntype: pb.HCNType(pb.HCNType_value[hcntype]),
-		Verbose: args.Verbose,
-	}
+func PrintHCNLogs(c pb.HCNServiceClient, req *pb.HCNRequest, reqCtx *ReqContext) {
+	hcntype, name, ip := pb.HCNType_name[int32(req.GetHcntype())], reqCtx.Server.Name, reqCtx.Server.Ip
+	fmt.Printf("Requesting HCN logs from %s (IP: %s)...\n", name, ip)
 
 	// Send request
 	res, err := c.GetHCNLogs(context.Background(), req)
 	if err != nil {
-		log.Fatalf("error while calling GetHCNLogs RPC (from IP: %s): %v", ip, err)
+		log.Fatalf("error while calling GetHCNLogs RPC from %s (IP: %s): %v", name, ip, err)
 	}
 
-	fmt.Printf("Received logs for %s (from IP: %s):\n\n%s\n", hcntype, ip, string(res.GetHcnResult()))
+	fmt.Printf("Received logs for %s from %s (IP: %s):\n\n%s\n", hcntype, name, ip, string(res.GetHcnResult()))
 
-	if wg != nil {
-		wg.Done()
+	if reqCtx.Wg != nil {
+		reqCtx.Wg.Done()
 	}
 }
 

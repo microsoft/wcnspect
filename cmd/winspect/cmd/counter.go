@@ -4,6 +4,8 @@ import (
 	"sync"
 
 	"github.com/microsoft/winspect/pkg/client"
+	"github.com/microsoft/winspect/pkg/k8spi"
+	pb "github.com/microsoft/winspect/rpc"
 
 	"github.com/spf13/cobra"
 )
@@ -51,8 +53,19 @@ func (cc *counterCmd) printCounters() {
 		c, closeClient := client.CreateConnection(ip)
 		defer closeClient()
 
-		params := &client.CounterParams{Node: ip, IncludeHidden: cc.includeHidden}
-		go client.PrintCounters(c, params, &wg)
+		ctx := &client.ReqContext{
+			Server: client.Node{
+				Name: k8spi.GetNodesIpToName(cc.nodeSet)[ip], //FIXME: move parsing to commands.go
+				Ip:   ip,
+			},
+			Wg: &wg,
+		}
+
+		req := &pb.CountersRequest{
+			IncludeHidden: cc.includeHidden,
+		}
+
+		go client.PrintCounters(c, req, ctx)
 	}
 
 	wg.Wait()

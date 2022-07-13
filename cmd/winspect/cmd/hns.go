@@ -4,6 +4,8 @@ import (
 	"sync"
 
 	"github.com/microsoft/winspect/pkg/client"
+	"github.com/microsoft/winspect/pkg/k8spi"
+	pb "github.com/microsoft/winspect/rpc"
 
 	"github.com/spf13/cobra"
 )
@@ -67,8 +69,20 @@ func (cc *hnsCmd) printLogs(subcmd string) {
 		c, closeClient := client.CreateConnection(ip)
 		defer closeClient()
 
-		params := &client.HCNParams{Cmd: subcmd, Node: ip, Verbose: cc.verbose}
-		go client.PrintHCNLogs(c, params, &wg)
+		ctx := &client.ReqContext{
+			Server: client.Node{
+				Name: k8spi.GetNodesIpToName(cc.nodeSet)[ip], //FIXME: move parsing to commands.go
+				Ip:   ip,
+			},
+			Wg: &wg,
+		}
+
+		req := &pb.HCNRequest{
+			Hcntype: pb.HCNType(pb.HCNType_value[subcmd]),
+			Verbose: cc.verbose,
+		}
+
+		go client.PrintHCNLogs(c, req, ctx)
 	}
 
 	wg.Wait()

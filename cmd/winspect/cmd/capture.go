@@ -10,6 +10,8 @@ import (
 
 	"github.com/microsoft/winspect/pkg/client"
 	"github.com/microsoft/winspect/pkg/comprise"
+	"github.com/microsoft/winspect/pkg/k8spi"
+	pb "github.com/microsoft/winspect/rpc"
 
 	"github.com/spf13/cobra"
 )
@@ -72,6 +74,8 @@ func (b *commandsBuilder) newCaptureCmd() *captureCmd {
 }
 
 func (cc *captureCmd) printCapture(subcmd string, endpoints []string) {
+	cc.validateArgs()
+
 	targetNodes := cc.getTargetNodes()
 	hostMap := make(map[string][]string)
 
@@ -113,21 +117,65 @@ func (cc *captureCmd) printCapture(subcmd string, endpoints []string) {
 		c, closeClient := client.CreateConnection(ip)
 		defer closeClient()
 
-		captureArgs := &client.CaptureParams{
-			Node:         ip,
-			Pods:         hostMap[ip],
-			Ips:          cc.ips,
-			Protocols:    cc.protocols,
-			Ports:        cc.ports,
-			Macs:         cc.macs,
-			Time:         cc.time,
-			PacketType:   cc.packetType,
-			CountersOnly: cc.countersOnly,
+		ctx := &client.ReqContext{
+			Server: client.Node{
+				Name: k8spi.GetNodesIpToName(cc.nodeSet)[ip], //FIXME: move parsing to commands.go
+				Ip:   ip,
+			},
+			Wg: &wg,
 		}
-		captureArgs.ValidateCaptureParams()
 
-		go client.RunCaptureStream(c, captureArgs, &wg)
+		req := &pb.CaptureRequest{
+			Duration: cc.time,
+			Modifier: cc.getModifiers(hostMap[ip]),
+			Filter:   cc.getFilters(),
+		}
+
+		go client.RunCaptureStream(c, req, ctx)
 	}
 
 	wg.Wait()
+}
+
+func (cc *captureCmd) getFilters() *pb.Filters {
+	return &pb.Filters{
+		Ips:       cc.ips,
+		Protocols: cc.protocols,
+		Ports:     cc.ports,
+		Macs:      cc.macs,
+	}
+}
+
+func (cc *captureCmd) getModifiers(pods []string) *pb.Modifiers {
+	return &pb.Modifiers{
+		Pods:         pods,
+		PacketType:   pb.PacketType(pb.PacketType_value[cc.packetType]),
+		CountersOnly: cc.countersOnly,
+	}
+}
+
+func (cc *captureCmd) validateArgs() {
+	if err := client.ValidateTime(cc.time); err != nil {
+		log.Fatal(err)
+	}
+
+	if err := client.ValidateIPAddrs(cc.ips); err != nil {
+		log.Fatal(err)
+	}
+
+	if err := client.ValidateProtocols(cc.protocols); err != nil {
+		log.Fatal(err)
+	}
+
+	if err := client.ValidatePorts(cc.ports); err != nil {
+		log.Fatal(err)
+	}
+
+	if err := client.ValidateMACAddrs(cc.macs); err != nil {
+		log.Fatal(err)
+	}
+
+	if err := client.ValidatePktType(cc.packetType); err != nil {
+		log.Fatal(err)
+	}
 }

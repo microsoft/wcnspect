@@ -20,7 +20,7 @@ var validPktTypes = strings.Split(common.ValidPacketTypes, " ")
 
 func ParseValidateNodes(nodes []string, nodeset []v1.Node) []string {
 	winNodes := k8spi.FilterNodes(nodeset, k8spi.WindowsOS)
-	winMap := k8spi.GetNodeMap(winNodes)
+	winMap := k8spi.GetNodesNameToIp(winNodes)
 	winNames, winIPs := comprise.Keys(winMap), comprise.Values(winMap)
 
 	if len(nodes) == 0 {
@@ -58,32 +58,6 @@ func ParseValidatePods(pods []string, podset []v1.Pod) map[string][]string {
 	}
 
 	return ret
-}
-
-func (args *CaptureParams) ValidateCaptureParams() {
-	if err := ValidateTime(args.Time); err != nil {
-		log.Fatal(err)
-	}
-
-	if err := ValidateIPAddrs(args.Ips); err != nil {
-		log.Fatal(err)
-	}
-
-	if err := ValidateProtocols(args.Protocols); err != nil {
-		log.Fatal(err)
-	}
-
-	if err := ValidatePorts(args.Ports); err != nil {
-		log.Fatal(err)
-	}
-
-	if err := ValidateMACAddrs(args.Macs); err != nil {
-		log.Fatal(err)
-	}
-
-	if err := ValidatePktType(args.PacketType); err != nil {
-		log.Fatal(err)
-	}
 }
 
 func ValidateTime(time int32) error {

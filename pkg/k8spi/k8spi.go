@@ -17,10 +17,19 @@ func FilterNodes(nodes []v1.Node, test func(v1.Node) bool) (ret []v1.Node) {
 /* Retrieves node names and ips given a list of nodes
 return map of node name to node ip
 */
-func GetNodeMap(nodes []v1.Node) map[string]string {
+func GetNodesNameToIp(nodes []v1.Node) map[string]string {
 	ret := map[string]string{}
 	for _, node := range nodes {
 		ret[node.GetName()] = RetrieveInternalIP(node)
+	}
+
+	return ret
+}
+
+func GetNodesIpToName(nodes []v1.Node) map[string]string {
+	ret := map[string]string{}
+	for _, node := range nodes {
+		ret[RetrieveInternalIP(node)] = node.GetName()
 	}
 
 	return ret

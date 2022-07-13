@@ -5,6 +5,9 @@ import (
 
 	"github.com/microsoft/winspect/pkg/client"
 	"github.com/microsoft/winspect/pkg/comprise"
+	"github.com/microsoft/winspect/pkg/k8spi"
+	pb "github.com/microsoft/winspect/rpc"
+
 	"github.com/spf13/cobra"
 )
 
@@ -49,8 +52,20 @@ func (cc *vfpCounterCmd) printVFPCounters() {
 		c, closeClient := client.CreateConnection(ip)
 		defer closeClient()
 
-		params := &client.VFPCounterParams{Node: ip, Pod: hostMap[ip][0], Verbose: cc.verbose}
-		go client.PrintVFPCounters(c, params, &wg)
+		ctx := &client.ReqContext{
+			Server: client.Node{
+				Name: k8spi.GetNodesIpToName(cc.nodeSet)[ip], //FIXME: move parsing to commands.go
+				Ip:   ip,
+			},
+			Wg: &wg,
+		}
+
+		req := &pb.VFPCountersRequest{
+			Pod:     hostMap[ip][0],
+			Verbose: cc.verbose,
+		}
+
+		go client.PrintVFPCounters(c, req, ctx)
 	}
 
 	wg.Wait()

@@ -86,7 +86,7 @@ func (b *commandsBuilder) newWinspectCmd() *winspectCmd {
 	cc.baseBuilderCmd = b.newBuilderCmd(&cobra.Command{
 		Use:   "winspect",
 		Short: "Winspect is an advanced distributed packet capture and HNS log collection tool.",
-		Long:  `An advanced distributed packet capture and HNS log collection tool made with Go (^‿^)`,
+		Long:  `An advanced distributed packet capture and HNS log collection tool made with Go (^_^)`,
 	})
 
 	if home := homedir.HomeDir(); home != "" {
@@ -107,8 +107,9 @@ type winspectBuilderCommon struct {
 	kubeconfig string
 
 	targetNodes []string
-	nodeSet     []v1.Node
-	podSet      []v1.Pod
+
+	nodeSet []v1.Node
+	podSet  []v1.Pod
 }
 
 func (cc *winspectBuilderCommon) initializeAKSClusterValues() {
