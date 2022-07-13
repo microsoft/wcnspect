@@ -1,10 +1,10 @@
 package cmd
 
 import (
+	"log"
 	"sync"
 
 	"github.com/microsoft/winspect/pkg/client"
-	"github.com/microsoft/winspect/pkg/comprise"
 	"github.com/microsoft/winspect/pkg/k8spi"
 	pb "github.com/microsoft/winspect/rpc"
 
@@ -42,26 +42,34 @@ func (b *commandsBuilder) newVfpCounterCmd() *vfpCounterCmd {
 }
 
 func (cc *vfpCounterCmd) printVFPCounters() {
-	hostMap := client.ParseValidatePods([]string{cc.pod}, cc.podSet)
-	targetNodes := comprise.Keys(hostMap)
+	pods := []string{cc.pod}
+
+	if err := client.ValidatePods(pods, cc.getPodNames()); err != nil {
+		log.Fatal(err)
+	}
+
+	hostMap := cc.getNodePodMap(pods)
+	targetNodes := cc.getPodsNodes(pods)
 
 	var wg sync.WaitGroup
-	for _, ip := range targetNodes {
+	for _, node := range targetNodes {
 		wg.Add(1)
+
+		name, ip := node.GetName(), k8spi.RetrieveInternalIP(node)
 
 		c, closeClient := client.CreateConnection(ip)
 		defer closeClient()
 
 		ctx := &client.ReqContext{
 			Server: client.Node{
-				Name: k8spi.GetNodesIpToName(cc.nodeSet)[ip], //FIXME: move parsing to commands.go
+				Name: name,
 				Ip:   ip,
 			},
 			Wg: &wg,
 		}
 
 		req := &pb.VFPCountersRequest{
-			Pod:     hostMap[ip][0],
+			Pod:     hostMap[name][0],
 			Verbose: cc.verbose,
 		}
 

@@ -42,6 +42,13 @@ func MapNodes(nodes []v1.Node, f func(v1.Node) string) (ret []string) {
 	return
 }
 
+func MapNodeNames(nodes []string, f func(string) v1.Node) (ret []v1.Node) {
+	for _, node := range nodes {
+		ret = append(ret, f(node))
+	}
+	return
+}
+
 func RetrieveInternalIP(node v1.Node) string {
 	for _, addr := range node.Status.Addresses {
 		if addr.Type == "InternalIP" {

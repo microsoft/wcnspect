@@ -37,6 +37,16 @@ func CreateEmptyMap(ls []string) map[string][]string {
 }
 
 // Methods for maps
+func Flip[K comparable, V comparable](m map[K]V) map[V]K {
+	inv := make(map[V]K, len(m))
+
+	for k, v := range m {
+		inv[v] = k
+	}
+
+	return inv
+}
+
 func Keys[K comparable, V any](m map[K]V) []K {
 	keys := make([]K, len(m))
 

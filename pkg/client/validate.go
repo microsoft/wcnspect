@@ -18,6 +18,24 @@ var validTCPFormats = comprise.Map(strings.Split(common.ValidTCPFlags, " "), fun
 var validProtocols = append(strings.Split(common.ValidProtocols, " "), validTCPFormats...)
 var validPktTypes = strings.Split(common.ValidPacketTypes, " ")
 
+func ValidateNodes(nodes []string, winNodes []string) error {
+	for _, node := range nodes {
+		if !comprise.Contains(winNodes, node) {
+			return fmt.Errorf("invalid windows node name: %s", node)
+		}
+	}
+	return nil
+}
+
+func ValidatePods(pods []string, podNames []string) error {
+	for _, pod := range pods {
+		if !comprise.Contains(podNames, pod) {
+			return fmt.Errorf("invalid windows pod name: %s", pod)
+		}
+	}
+	return nil
+}
+
 func ParseValidateNodes(nodes []string, nodeset []v1.Node) []string {
 	winNodes := k8spi.FilterNodes(nodeset, k8spi.WindowsOS)
 	winMap := k8spi.GetNodesNameToIp(winNodes)

@@ -1,6 +1,7 @@
 package cmd
 
 import (
+	"log"
 	"sync"
 
 	"github.com/microsoft/winspect/pkg/client"
@@ -40,22 +41,28 @@ func (b *commandsBuilder) newCounterCmd() *counterCmd {
 }
 
 func (cc *counterCmd) printCounters() {
-	targetNodes := cc.getTargetNodes()
+	targetNodes := cc.getWinNodes()
 
 	if len(cc.nodes) > 0 {
-		targetNodes = client.ParseValidateNodes(cc.nodes, cc.nodeSet)
+		if err := client.ValidateNodes(cc.nodes, cc.getWinNodeNames()); err != nil {
+			log.Fatal(err)
+		}
+
+		targetNodes = cc.getNodes(cc.nodes)
 	}
 
 	var wg sync.WaitGroup
-	for _, ip := range targetNodes {
+	for _, node := range targetNodes {
 		wg.Add(1)
+
+		name, ip := node.GetName(), k8spi.RetrieveInternalIP(node)
 
 		c, closeClient := client.CreateConnection(ip)
 		defer closeClient()
 
 		ctx := &client.ReqContext{
 			Server: client.Node{
-				Name: k8spi.GetNodesIpToName(cc.nodeSet)[ip], //FIXME: move parsing to commands.go
+				Name: name,
 				Ip:   ip,
 			},
 			Wg: &wg,

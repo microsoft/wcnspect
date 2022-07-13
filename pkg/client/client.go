@@ -8,11 +8,18 @@ import (
 	"sync"
 
 	"github.com/microsoft/winspect/common"
+	"github.com/microsoft/winspect/pkg/k8spi"
 	pb "github.com/microsoft/winspect/rpc"
 
 	"google.golang.org/grpc"
 	"google.golang.org/protobuf/types/known/timestamppb"
+	v1 "k8s.io/api/core/v1"
 )
+
+type client struct {
+	pb.CaptureServiceClient
+	pb.HCNServiceClient
+}
 
 type Node struct {
 	Name string
@@ -24,9 +31,10 @@ type ReqContext struct {
 	Wg     *sync.WaitGroup
 }
 
-type client struct {
-	pb.CaptureServiceClient
-	pb.HCNServiceClient
+func (rq *ReqContext) Done() {
+	if rq.Wg != nil {
+		rq.Wg.Done()
+	}
 }
 
 func CreateConnection(ip string) (*client, func() error) {
@@ -73,29 +81,26 @@ func RunCaptureStream(c pb.CaptureServiceClient, req *pb.CaptureRequest, reqCtx 
 
 	fmt.Printf("Finished receiving stream from %s (IP: %s).\n", name, ip)
 
-	if reqCtx.Wg != nil {
-		reqCtx.Wg.Done()
-	}
+	reqCtx.Done()
 }
 
-func RunStopCapture(c pb.CaptureServiceClient, ip string, wg *sync.WaitGroup) {
+func RunStopCapture(c pb.CaptureServiceClient, reqCtx *ReqContext) {
+	name, ip := reqCtx.Server.Name, reqCtx.Server.Ip
 	res, err := c.StopCapture(context.Background(), &pb.Empty{})
 	if err != nil {
-		log.Fatalf("error while calling StopCapture RPC (from IP: %s): %v", ip, err)
+		log.Fatalf("error while calling StopCapture RPC from %s (IP: %s): %v", name, ip, err)
 	}
 
 	msg, timestamp := res.GetResult(), res.GetTimestamp().AsTime()
 	if len(msg) != 0 {
-		fmt.Printf("StopCapture successfully ran on IP: %s at time: %s with output: \n%s\n", ip, timestamp, msg)
+		fmt.Printf("StopCapture successfully ran on node: %s (IP: %s) at time: %s with output: \n%s\n", name, ip, timestamp, msg)
 	} else {
-		fmt.Printf("StopCapture successfully ran at time: %s.\n", timestamp)
+		fmt.Printf("StopCapture successfully ran on node: %s (IP: %s) at time: %s.\n", name, ip, timestamp)
 	}
 
-	fmt.Printf("Packet capture ended on IP: %s.\n", ip)
+	fmt.Printf("Packet capture ended on node: %s (IP: %s).\n", name, ip)
 
-	if wg != nil {
-		wg.Done()
-	}
+	reqCtx.Done()
 }
 
 func PrintCounters(c pb.CaptureServiceClient, req *pb.CountersRequest, reqCtx *ReqContext) {
@@ -111,9 +116,7 @@ func PrintCounters(c pb.CaptureServiceClient, req *pb.CountersRequest, reqCtx *R
 	msg, timestamp := res.GetResult(), res.GetTimestamp().AsTime()
 	fmt.Printf("Received GetCounters RPC response from %s (IP: %s) at time: %s -\n%s\n", name, ip, timestamp, msg)
 
-	if reqCtx.Wg != nil {
-		reqCtx.Wg.Done()
-	}
+	reqCtx.Done()
 }
 
 func PrintVFPCounters(c pb.CaptureServiceClient, req *pb.VFPCountersRequest, reqCtx *ReqContext) {
@@ -129,9 +132,7 @@ func PrintVFPCounters(c pb.CaptureServiceClient, req *pb.VFPCountersRequest, req
 	msg, timestamp := res.GetResult(), res.GetTimestamp().AsTime()
 	fmt.Printf("Received GetVFPCounters RPC response from %s (IP: %s) at time: %s -\n%s\n", name, ip, timestamp, msg)
 
-	if reqCtx.Wg != nil {
-		reqCtx.Wg.Done()
-	}
+	reqCtx.Done()
 }
 
 func PrintHCNLogs(c pb.HCNServiceClient, req *pb.HCNRequest, reqCtx *ReqContext) {
@@ -146,23 +147,33 @@ func PrintHCNLogs(c pb.HCNServiceClient, req *pb.HCNRequest, reqCtx *ReqContext)
 
 	fmt.Printf("Received logs for %s from %s (IP: %s):\n\n%s\n", hcntype, name, ip, string(res.GetHcnResult()))
 
-	if reqCtx.Wg != nil {
-		reqCtx.Wg.Done()
-	}
+	reqCtx.Done()
 }
 
-func Cleanup(nodes []string) {
+func Cleanup(nodes []v1.Node) {
 	var wg sync.WaitGroup
-	for _, ip := range nodes {
+	for _, node := range nodes {
 		// Increment the WaitGroup counter
 		wg.Add(1)
+
+		// Get target name and ip
+		name, ip := node.GetName(), k8spi.RetrieveInternalIP(node)
 
 		// Create connections
 		c, closeClient := CreateConnection(ip)
 		defer closeClient()
 
+		// Create request context
+		ctx := &ReqContext{
+			Server: Node{
+				Name: name,
+				Ip:   ip,
+			},
+			Wg: &wg,
+		}
+
 		// Launch a goroutine to run the request
-		go RunStopCapture(c, ip, &wg)
+		go RunStopCapture(c, ctx)
 	}
 
 	// Wait for all captures to complete

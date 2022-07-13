@@ -9,7 +9,6 @@ import (
 	"syscall"
 
 	"github.com/microsoft/winspect/pkg/client"
-	"github.com/microsoft/winspect/pkg/comprise"
 	"github.com/microsoft/winspect/pkg/k8spi"
 	pb "github.com/microsoft/winspect/rpc"
 
@@ -76,29 +75,34 @@ func (b *commandsBuilder) newCaptureCmd() *captureCmd {
 func (cc *captureCmd) printCapture(subcmd string, endpoints []string) {
 	cc.validateArgs()
 
-	targetNodes := cc.getTargetNodes()
+	targetNodes := cc.getWinNodes()
 	hostMap := make(map[string][]string)
 
 	// Revise nodes and pods arguments based on command name
 	switch subcmd {
-	case "all":
-		hostMap = comprise.CreateEmptyMap(targetNodes)
 	case "nodes":
 		if len(endpoints) == 0 {
 			log.Fatal("must pass node names when using 'winspect capture nodes ...'")
 		}
 
 		nodes := strings.Split(endpoints[0], ",")
-		targetNodes = client.ParseValidateNodes(nodes, cc.nodeSet)
-		hostMap = comprise.CreateEmptyMap(targetNodes)
+		if err := client.ValidateNodes(nodes, cc.getWinNodeNames()); err != nil {
+			log.Fatal(err)
+		}
+
+		targetNodes = cc.getNodes(nodes)
 	case "pods":
 		if len(endpoints) == 0 {
 			log.Fatal("must pass pod names when using 'winspect capture pods ...'")
 		}
 
 		pods := strings.Split(endpoints[0], ",")
-		hostMap = client.ParseValidatePods(pods, cc.podSet)
-		targetNodes = comprise.Keys(hostMap)
+		if err := client.ValidatePods(pods, cc.getPodNames()); err != nil {
+			log.Fatal(err)
+		}
+
+		hostMap = cc.getNodePodMap(pods)
+		targetNodes = cc.getPodsNodes(pods)
 	}
 
 	// Capture any sigint to send a StopCapture request
@@ -111,15 +115,17 @@ func (cc *captureCmd) printCapture(subcmd string, endpoints []string) {
 	}()
 
 	var wg sync.WaitGroup
-	for _, ip := range targetNodes {
+	for _, node := range targetNodes {
 		wg.Add(1)
+
+		name, ip := node.GetName(), k8spi.RetrieveInternalIP(node)
 
 		c, closeClient := client.CreateConnection(ip)
 		defer closeClient()
 
 		ctx := &client.ReqContext{
 			Server: client.Node{
-				Name: k8spi.GetNodesIpToName(cc.nodeSet)[ip], //FIXME: move parsing to commands.go
+				Name: name,
 				Ip:   ip,
 			},
 			Wg: &wg,
@@ -127,7 +133,7 @@ func (cc *captureCmd) printCapture(subcmd string, endpoints []string) {
 
 		req := &pb.CaptureRequest{
 			Duration: cc.time,
-			Modifier: cc.getModifiers(hostMap[ip]),
+			Modifier: cc.getModifiers(hostMap[name]),
 			Filter:   cc.getFilters(),
 		}
 
