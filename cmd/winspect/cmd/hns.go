@@ -1,7 +1,6 @@
 package cmd
 
 import (
-	"log"
 	"sync"
 
 	"github.com/microsoft/winspect/pkg/client"
@@ -9,20 +8,22 @@ import (
 	"github.com/spf13/cobra"
 )
 
-var hnsCmd = &cobra.Command{
-	Use:   "hns",
-	Short: "The 'hns' command will retrieve hns logs on all windows nodes.",
-	Long: `The 'hns' command will retrieve hns logs on all windows nodes. For example:
-'winspect hns all --nodes {nodes} --json`,
+type hnsCmd struct {
+	nodes   []string
+	verbose bool
+
+	*baseBuilderCmd
 }
 
-func init() {
-	var nodes []string
-	var verbose bool
+func (b *commandsBuilder) newHnsCmd() *hnsCmd {
+	cc := &hnsCmd{}
 
-	rootCmd.AddCommand(hnsCmd)
-	hnsCmd.PersistentFlags().StringSliceVarP(&nodes, "nodes", "n", []string{}, "Specify which nodes winspect should send requests to using node names. Runs on all windows nodes by default.")
-	hnsCmd.PersistentFlags().BoolVarP(&verbose, "json", "d", false, "Detailed option for logs.")
+	cmd := &cobra.Command{
+		Use:   "hns",
+		Short: "The 'hns' command will retrieve hns logs on all windows nodes.",
+		Long: `The 'hns' command will retrieve hns logs on all windows nodes. For example:
+	'winspect hns all --nodes {nodes} --json`,
+	}
 
 	logTypes := []string{"all", "endpoints", "loadbalancers", "namespaces", "networks"}
 	logHelp := map[string]string{
@@ -33,29 +34,30 @@ func init() {
 		"networks":      "Retrieve logs for networks on each node.",
 	}
 	for _, name := range logTypes {
-		cmd := &cobra.Command{
+		subcmd := &cobra.Command{
 			Use:   name,
 			Short: logHelp[name],
-			Run:   getLogs,
+			Run: func(cmd *cobra.Command, args []string) {
+				cc.printLogs(cmd.Name())
+			},
 		}
 
-		hnsCmd.AddCommand(cmd)
+		cmd.AddCommand(subcmd)
 	}
+
+	cmd.PersistentFlags().StringSliceVarP(&cc.nodes, "nodes", "n", []string{}, "Specify which nodes winspect should send requests to using node names. Runs on all windows nodes by default.")
+	cmd.PersistentFlags().BoolVarP(&cc.verbose, "json", "d", false, "Detailed option for logs.")
+
+	cc.baseBuilderCmd = b.newBuilderCmd(cmd)
+
+	return cc
 }
 
-func getLogs(cmd *cobra.Command, args []string) {
-	nodes, err := cmd.Flags().GetStringSlice("nodes")
-	if err != nil {
-		log.Fatal(err)
-	}
+func (cc *hnsCmd) printLogs(subcmd string) {
+	targetNodes := cc.getTargetNodes()
 
-	verbose, err := cmd.Flags().GetBool("json")
-	if err != nil {
-		log.Fatal(err)
-	}
-
-	if len(nodes) != 0 {
-		targetNodes = client.ParseValidateNodes(nodes, nodeSet)
+	if len(cc.nodes) != 0 {
+		targetNodes = client.ParseValidateNodes(cc.nodes, cc.nodeSet)
 	}
 
 	var wg sync.WaitGroup
@@ -65,8 +67,8 @@ func getLogs(cmd *cobra.Command, args []string) {
 		c, closeClient := client.CreateConnection(ip)
 		defer closeClient()
 
-		params := client.HCNParams{Cmd: cmd.Name(), Node: ip, Verbose: verbose}
-		go client.PrintHCNLogs(c, &params, &wg)
+		params := &client.HCNParams{Cmd: subcmd, Node: ip, Verbose: cc.verbose}
+		go client.PrintHCNLogs(c, params, &wg)
 	}
 
 	wg.Wait()

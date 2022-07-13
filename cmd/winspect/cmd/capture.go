@@ -14,25 +14,29 @@ import (
 	"github.com/spf13/cobra"
 )
 
-var captureArgs = client.CaptureParams{}
+type captureCmd struct {
+	time int32
 
-var captureCmd = &cobra.Command{
-	Use:   "capture",
-	Short: "The 'capture' command will run a packet capture on all windows nodes.",
-	Long: `The 'capture' command will run a packet capture on all windows nodes. For example:
-'winspect capture pods {pods} --protocols TCP -d 10'.`,
+	ips       []string
+	protocols []string
+	ports     []string
+	macs      []string
+
+	packetType   string
+	countersOnly bool
+
+	*baseBuilderCmd
 }
 
-func init() {
-	rootCmd.AddCommand(captureCmd)
+func (b *commandsBuilder) newCaptureCmd() *captureCmd {
+	cc := &captureCmd{}
 
-	captureCmd.PersistentFlags().StringSliceVarP(&captureArgs.Ips, "ips", "i", []string{}, "Match source or destination IP address. CIDR supported.")
-	captureCmd.PersistentFlags().StringSliceVarP(&captureArgs.Protocols, "protocols", "t", []string{}, "Match by transport protocol. Can be TCP, UDP, ICMP, and/or TCP_{tcp flag}.")
-	captureCmd.PersistentFlags().StringSliceVarP(&captureArgs.Ports, "ports", "r", []string{}, "Match source or destination port number.")
-	captureCmd.PersistentFlags().StringSliceVarP(&captureArgs.Macs, "macs", "m", []string{}, "Match source or destination MAC address.")
-	captureCmd.PersistentFlags().Int32VarP(&captureArgs.Time, "time", "d", 0, "Time to run packet capture for (in seconds). Runs indefinitely given 0.")
-	captureCmd.PersistentFlags().StringVar(&captureArgs.PacketType, "type", "all", "Select which packets to capture. Can be all, flow, or drop.")
-	captureCmd.PersistentFlags().BoolVar(&captureArgs.CountersOnly, "counters-only", false, "Collect packet counters only. No packet logging.")
+	cmd := &cobra.Command{
+		Use:   "capture",
+		Short: "The 'capture' command will run a packet capture on all windows nodes.",
+		Long: `The 'capture' command will run a packet capture on all windows nodes. For example:
+	'winspect capture pods {pods} --protocols TCP -d 10'.`,
+	}
 
 	captureTypes := []string{"all", "nodes", "pods"}
 	captureHelp := map[string]string{
@@ -41,38 +45,55 @@ func init() {
 		"pods":  "Specify which pods the capture should filter on. Supports up to two pod names. Automatically defines nodes to capture on.",
 	}
 	for _, name := range captureTypes {
-		cmd := &cobra.Command{
+		subcmd := &cobra.Command{
 			Use:   name,
 			Short: captureHelp[name],
-			Run:   getCapture,
+			Run: func(cmd *cobra.Command, args []string) {
+				cc.printCapture(cmd.Name(), args)
+			},
 		}
 
-		captureCmd.AddCommand(cmd)
+		cmd.AddCommand(subcmd)
 	}
+
+	cmd.PersistentFlags().Int32VarP(&cc.time, "time", "d", 0, "Time to run packet capture for (in seconds). Runs indefinitely given 0.")
+
+	cmd.PersistentFlags().StringSliceVarP(&cc.ips, "ips", "i", []string{}, "Match source or destination IP address. CIDR supported.")
+	cmd.PersistentFlags().StringSliceVarP(&cc.protocols, "protocols", "t", []string{}, "Match by transport protocol. Can be TCP, UDP, ICMP, and/or TCP_{tcp flag}.")
+	cmd.PersistentFlags().StringSliceVarP(&cc.ports, "ports", "r", []string{}, "Match source or destination port number.")
+	cmd.PersistentFlags().StringSliceVarP(&cc.macs, "macs", "m", []string{}, "Match source or destination MAC address.")
+
+	cmd.PersistentFlags().StringVar(&cc.packetType, "type", "all", "Select which packets to capture. Can be all, flow, or drop.")
+	cmd.PersistentFlags().BoolVar(&cc.countersOnly, "counters-only", false, "Collect packet counters only. No packet logging.")
+
+	cc.baseBuilderCmd = b.newBuilderCmd(cmd)
+
+	return cc
 }
 
-func getCapture(cmd *cobra.Command, args []string) {
+func (cc *captureCmd) printCapture(subcmd string, endpoints []string) {
+	targetNodes := cc.getTargetNodes()
 	hostMap := make(map[string][]string)
 
 	// Revise nodes and pods arguments based on command name
-	switch cmd.Name() {
+	switch subcmd {
 	case "all":
 		hostMap = comprise.CreateEmptyMap(targetNodes)
 	case "nodes":
-		if len(args) == 0 {
+		if len(endpoints) == 0 {
 			log.Fatal("must pass node names when using 'winspect capture nodes ...'")
 		}
 
-		nodes := strings.Split(args[0], ",")
-		targetNodes = client.ParseValidateNodes(nodes, nodeSet)
+		nodes := strings.Split(endpoints[0], ",")
+		targetNodes = client.ParseValidateNodes(nodes, cc.nodeSet)
 		hostMap = comprise.CreateEmptyMap(targetNodes)
 	case "pods":
-		if len(args) == 0 {
+		if len(endpoints) == 0 {
 			log.Fatal("must pass pod names when using 'winspect capture pods ...'")
 		}
-		// populate node : pods map so that can be used in loop
-		pods := strings.Split(args[0], ",")
-		hostMap = client.ParseValidatePods(pods, podSet)
+
+		pods := strings.Split(endpoints[0], ",")
+		hostMap = client.ParseValidatePods(pods, cc.podSet)
 		targetNodes = comprise.Keys(hostMap)
 	}
 
@@ -92,20 +113,20 @@ func getCapture(cmd *cobra.Command, args []string) {
 		c, closeClient := client.CreateConnection(ip)
 		defer closeClient()
 
-		cArgs := client.CaptureParams{
+		captureArgs := &client.CaptureParams{
 			Node:         ip,
 			Pods:         hostMap[ip],
-			Ips:          captureArgs.Ips,
-			Protocols:    captureArgs.Protocols,
-			Ports:        captureArgs.Ports,
-			Macs:         captureArgs.Macs,
-			Time:         captureArgs.Time,
-			PacketType:   captureArgs.PacketType,
-			CountersOnly: captureArgs.CountersOnly,
+			Ips:          cc.ips,
+			Protocols:    cc.protocols,
+			Ports:        cc.ports,
+			Macs:         cc.macs,
+			Time:         cc.time,
+			PacketType:   cc.packetType,
+			CountersOnly: cc.countersOnly,
 		}
-		cArgs.ValidateCaptureParams()
+		captureArgs.ValidateCaptureParams()
 
-		go client.RunCaptureStream(c, &cArgs, &wg)
+		go client.RunCaptureStream(c, captureArgs, &wg)
 	}
 
 	wg.Wait()
