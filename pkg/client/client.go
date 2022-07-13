@@ -8,44 +8,33 @@ import (
 	"sync"
 
 	"github.com/microsoft/winspect/common"
+	"github.com/microsoft/winspect/pkg/k8spi"
 	pb "github.com/microsoft/winspect/rpc"
 
 	"google.golang.org/grpc"
 	"google.golang.org/protobuf/types/known/timestamppb"
+	v1 "k8s.io/api/core/v1"
 )
-
-type CaptureParams struct {
-	Node         string
-	Pods         []string
-	Ips          []string
-	Protocols    []string
-	Ports        []string
-	Macs         []string
-	Time         int32
-	PacketType   string
-	CountersOnly bool
-}
-
-type CounterParams struct {
-	Node          string
-	IncludeHidden bool
-}
-
-type VFPCounterParams struct {
-	Node    string
-	Pod     string
-	Verbose bool
-}
-
-type HCNParams struct {
-	Cmd     string
-	Node    string
-	Verbose bool
-}
 
 type client struct {
 	pb.CaptureServiceClient
 	pb.HCNServiceClient
+}
+
+type Node struct {
+	Name string
+	Ip   string
+}
+
+type ReqContext struct {
+	Server Node
+	Wg     *sync.WaitGroup
+}
+
+func (rq *ReqContext) Done() {
+	if rq.Wg != nil {
+		rq.Wg.Done()
+	}
 }
 
 func CreateConnection(ip string) (*client, func() error) {
@@ -63,31 +52,17 @@ func CreateConnection(ip string) (*client, func() error) {
 	return c, cc.Close
 }
 
-func RunCaptureStream(c pb.CaptureServiceClient, args *CaptureParams, wg *sync.WaitGroup) {
-	ip := args.Node
-	fmt.Printf("Starting to do a Server Streaming RPC (from IP: %s)...\n", ip)
+func RunCaptureStream(c pb.CaptureServiceClient, req *pb.CaptureRequest, reqCtx *ReqContext) {
+	name, ip := reqCtx.Server.Name, reqCtx.Server.Ip
+	fmt.Printf("Starting to do a Server Streaming RPC from %s (IP: %s)...\n", name, ip)
 
 	// Create request object
-	req := &pb.CaptureRequest{
-		Duration:  args.Time,
-		Timestamp: timestamppb.Now(),
-		Modifier: &pb.Modifiers{
-			Pods:         args.Pods,
-			PacketType:   pb.PacketType(pb.PacketType_value[args.PacketType]),
-			CountersOnly: args.CountersOnly,
-		},
-		Filter: &pb.Filters{
-			Ips:       args.Ips,
-			Protocols: args.Protocols,
-			Ports:     args.Ports,
-			Macs:      args.Macs,
-		},
-	}
+	req.Timestamp = timestamppb.Now()
 
 	// Send request
 	resStream, err := c.StartCapture(context.Background(), req)
 	if err != nil {
-		log.Fatalf("error while calling StartCapture RPC (from IP: %s): %v", ip, err)
+		log.Fatalf("error while calling StartCapture RPC from %s (from IP: %s): %v", name, ip, err)
 	}
 
 	for {
@@ -98,121 +73,107 @@ func RunCaptureStream(c pb.CaptureServiceClient, args *CaptureParams, wg *sync.W
 		}
 
 		if err != nil {
-			log.Fatalf("error while reading stream (from IP: %s): %v", ip, err)
+			log.Fatalf("error while reading stream from %s (from IP: %s): %v", name, ip, err)
 		}
 
-		fmt.Printf("Response from StartCapture (%s) sent at %s: \n%v\n", ip, msg.GetTimestamp().AsTime(), msg.GetResult())
+		fmt.Printf("Response from %s StartCapture (%s) sent at %s: \n%v\n", name, ip, msg.GetTimestamp().AsTime(), msg.GetResult())
 	}
 
-	fmt.Printf("Finished receiving stream from IP: %s.\n", ip)
+	fmt.Printf("Finished receiving stream from %s (IP: %s).\n", name, ip)
 
-	if wg != nil {
-		wg.Done()
-	}
+	reqCtx.Done()
 }
 
-func RunStopCapture(c pb.CaptureServiceClient, ip string, wg *sync.WaitGroup) {
+func RunStopCapture(c pb.CaptureServiceClient, reqCtx *ReqContext) {
+	name, ip := reqCtx.Server.Name, reqCtx.Server.Ip
 	res, err := c.StopCapture(context.Background(), &pb.Empty{})
 	if err != nil {
-		log.Fatalf("error while calling StopCapture RPC (from IP: %s): %v", ip, err)
+		log.Fatalf("error while calling StopCapture RPC from %s (IP: %s): %v", name, ip, err)
 	}
 
 	msg, timestamp := res.GetResult(), res.GetTimestamp().AsTime()
 	if len(msg) != 0 {
-		fmt.Printf("StopCapture successfully ran on IP: %s at time: %s with output: \n%s\n", ip, timestamp, msg)
+		fmt.Printf("StopCapture successfully ran on node: %s (IP: %s) at time: %s with output: \n%s\n", name, ip, timestamp, msg)
 	} else {
-		fmt.Printf("StopCapture successfully ran at time: %s.\n", timestamp)
+		fmt.Printf("StopCapture successfully ran on node: %s (IP: %s) at time: %s.\n", name, ip, timestamp)
 	}
 
-	fmt.Printf("Packet capture ended on IP: %s.\n", ip)
+	fmt.Printf("Packet capture ended on node: %s (IP: %s).\n", name, ip)
 
-	if wg != nil {
-		wg.Done()
-	}
+	reqCtx.Done()
 }
 
-func PrintCounters(c pb.CaptureServiceClient, args *CounterParams, wg *sync.WaitGroup) {
-	ip := args.Node
-	fmt.Printf("Requesting packet counters table (from IP: %s)...\n", ip)
-
-	// Create request object
-	req := &pb.CountersRequest{
-		IncludeHidden: args.IncludeHidden,
-	}
+func PrintCounters(c pb.CaptureServiceClient, req *pb.CountersRequest, reqCtx *ReqContext) {
+	name, ip := reqCtx.Server.Name, reqCtx.Server.Ip
+	fmt.Printf("Requesting packet counters table from %s (IP: %s)...\n", name, ip)
 
 	// Send request
 	res, err := c.GetCounters(context.Background(), req)
 	if err != nil {
-		log.Fatalf("error while calling GetCounters RPC (from IP: %s): %v", ip, err)
+		log.Fatalf("error while calling GetCounters RPC from %s (IP: %s): %v", name, ip, err)
 	}
 
 	msg, timestamp := res.GetResult(), res.GetTimestamp().AsTime()
-	fmt.Printf("Received GetCounters RPC response (from IP: %s) at time: %s -\n%s\n", ip, timestamp, msg)
+	fmt.Printf("Received GetCounters RPC response from %s (IP: %s) at time: %s -\n%s\n", name, ip, timestamp, msg)
 
-	if wg != nil {
-		wg.Done()
-	}
+	reqCtx.Done()
 }
 
-func PrintVFPCounters(c pb.CaptureServiceClient, args *VFPCounterParams, wg *sync.WaitGroup) {
-	ip := args.Node
-	fmt.Printf("Requesting VFP packet counters table (from IP: %s)...\n", ip)
-
-	// Create request object
-	req := &pb.VFPCountersRequest{
-		Pod:     args.Pod,
-		Verbose: args.Verbose,
-	}
+func PrintVFPCounters(c pb.CaptureServiceClient, req *pb.VFPCountersRequest, reqCtx *ReqContext) {
+	name, ip := reqCtx.Server.Name, reqCtx.Server.Ip
+	fmt.Printf("Requesting VFP packet counters table from %s (IP: %s)...\n", name, ip)
 
 	// Send request
 	res, err := c.GetVFPCounters(context.Background(), req)
 	if err != nil {
-		log.Fatalf("error while calling GetVFPCounters RPC (from IP: %s): %v", ip, err)
+		log.Fatalf("error while calling GetVFPCounters RPC from %s (IP: %s): %v", name, ip, err)
 	}
 
 	msg, timestamp := res.GetResult(), res.GetTimestamp().AsTime()
-	fmt.Printf("Received GetVFPCounters RPC response (from IP: %s) at time: %s -\n%s\n", ip, timestamp, msg)
+	fmt.Printf("Received GetVFPCounters RPC response from %s (IP: %s) at time: %s -\n%s\n", name, ip, timestamp, msg)
 
-	if wg != nil {
-		wg.Done()
-	}
+	reqCtx.Done()
 }
 
-func PrintHCNLogs(c pb.HCNServiceClient, args *HCNParams, wg *sync.WaitGroup) {
-	hcntype, ip := args.Cmd, args.Node
-	fmt.Printf("Requesting HCN logs (from IP: %s)...\n", ip)
-
-	// Create request object
-	req := &pb.HCNRequest{
-		Hcntype: pb.HCNType(pb.HCNType_value[hcntype]),
-		Verbose: args.Verbose,
-	}
+func PrintHCNLogs(c pb.HCNServiceClient, req *pb.HCNRequest, reqCtx *ReqContext) {
+	hcntype, name, ip := pb.HCNType_name[int32(req.GetHcntype())], reqCtx.Server.Name, reqCtx.Server.Ip
+	fmt.Printf("Requesting HCN logs from %s (IP: %s)...\n", name, ip)
 
 	// Send request
 	res, err := c.GetHCNLogs(context.Background(), req)
 	if err != nil {
-		log.Fatalf("error while calling GetHCNLogs RPC (from IP: %s): %v", ip, err)
+		log.Fatalf("error while calling GetHCNLogs RPC from %s (IP: %s): %v", name, ip, err)
 	}
 
-	fmt.Printf("Received logs for %s (from IP: %s):\n\n%s\n", hcntype, ip, string(res.GetHcnResult()))
+	fmt.Printf("Received logs for %s from %s (IP: %s):\n\n%s\n", hcntype, name, ip, string(res.GetHcnResult()))
 
-	if wg != nil {
-		wg.Done()
-	}
+	reqCtx.Done()
 }
 
-func Cleanup(nodes []string) {
+func Cleanup(nodes []v1.Node) {
 	var wg sync.WaitGroup
-	for _, ip := range nodes {
+	for _, node := range nodes {
 		// Increment the WaitGroup counter
 		wg.Add(1)
+
+		// Get target name and ip
+		name, ip := node.GetName(), k8spi.RetrieveInternalIP(node)
 
 		// Create connections
 		c, closeClient := CreateConnection(ip)
 		defer closeClient()
 
+		// Create request context
+		ctx := &ReqContext{
+			Server: Node{
+				Name: name,
+				Ip:   ip,
+			},
+			Wg: &wg,
+		}
+
 		// Launch a goroutine to run the request
-		go RunStopCapture(c, ip, &wg)
+		go RunStopCapture(c, ctx)
 	}
 
 	// Wait for all captures to complete

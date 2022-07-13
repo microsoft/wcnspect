@@ -2,88 +2,34 @@ package client
 
 import (
 	"fmt"
-	"log"
 	"net"
 	"strconv"
 	"strings"
 
 	"github.com/microsoft/winspect/common"
 	"github.com/microsoft/winspect/pkg/comprise"
-	"github.com/microsoft/winspect/pkg/k8spi"
-
-	v1 "k8s.io/api/core/v1"
 )
 
 var validTCPFormats = comprise.Map(strings.Split(common.ValidTCPFlags, " "), func(s string) string { return "TCP_" + s })
 var validProtocols = append(strings.Split(common.ValidProtocols, " "), validTCPFormats...)
 var validPktTypes = strings.Split(common.ValidPacketTypes, " ")
 
-func ParseValidateNodes(nodes []string, nodeset []v1.Node) []string {
-	winNodes := k8spi.FilterNodes(nodeset, k8spi.WindowsOS)
-	winMap := k8spi.GetNodeMap(winNodes)
-	winNames, winIPs := comprise.Keys(winMap), comprise.Values(winMap)
-
-	if len(nodes) == 0 {
-		return winIPs
-	}
-
+func ValidateNodes(nodes []string, winNodes []string) error {
 	for _, node := range nodes {
-		if !comprise.Contains(winNames, node) {
-			log.Fatalf("invalid windows node name: %s", node)
+		if !comprise.Contains(winNodes, node) {
+			return fmt.Errorf("invalid windows node name: %s", node)
 		}
 	}
-
-	translateName := func(name string) string { return winMap[name] }
-	return comprise.Map(nodes, translateName)
+	return nil
 }
 
-func ParseValidatePods(pods []string, podset []v1.Pod) map[string][]string {
-	ret := make(map[string][]string)
-	if len(pods) == 0 {
-		return ret
-	}
-
-	podIPs, podNodes := k8spi.GetPodMaps(podset)
-	podNames := comprise.Keys(podIPs)
-
+func ValidatePods(pods []string, podNames []string) error {
 	for _, pod := range pods {
 		if !comprise.Contains(podNames, pod) {
-			log.Fatalf("invalid pod name: %s", pod)
+			return fmt.Errorf("invalid windows pod name: %s", pod)
 		}
 	}
-
-	for _, pod := range pods {
-		podIP, nodeIP := podIPs[pod], podNodes[pod]
-		ret[nodeIP] = append(ret[nodeIP], podIP)
-	}
-
-	return ret
-}
-
-func (args *CaptureParams) ValidateCaptureParams() {
-	if err := ValidateTime(args.Time); err != nil {
-		log.Fatal(err)
-	}
-
-	if err := ValidateIPAddrs(args.Ips); err != nil {
-		log.Fatal(err)
-	}
-
-	if err := ValidateProtocols(args.Protocols); err != nil {
-		log.Fatal(err)
-	}
-
-	if err := ValidatePorts(args.Ports); err != nil {
-		log.Fatal(err)
-	}
-
-	if err := ValidateMACAddrs(args.Macs); err != nil {
-		log.Fatal(err)
-	}
-
-	if err := ValidatePktType(args.PacketType); err != nil {
-		log.Fatal(err)
-	}
+	return nil
 }
 
 func ValidateTime(time int32) error {

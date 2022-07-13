@@ -5,53 +5,74 @@ import (
 	"sync"
 
 	"github.com/microsoft/winspect/pkg/client"
+	"github.com/microsoft/winspect/pkg/k8spi"
+	pb "github.com/microsoft/winspect/rpc"
 
 	"github.com/spf13/cobra"
 )
 
-var counterCmd = &cobra.Command{
-	Use:   "counter",
-	Short: "The 'counter' command will retrieve packet counter tables from all windows nodes.",
-	Long: `The 'counter' command will retrieve packet counter tables from all windows nodes. 
-This command requires that a capture is being run on the requested nodes. For example:
-'winspect counter --nodes {nodes} --include-hidden`,
-	Run: getCounters,
+type counterCmd struct {
+	nodes         []string
+	includeHidden bool
+
+	*baseBuilderCmd
 }
 
-func init() {
-	var nodes []string
-	var includeHidden bool
+func (b *commandsBuilder) newCounterCmd() *counterCmd {
+	cc := &counterCmd{}
 
-	rootCmd.AddCommand(counterCmd)
+	cmd := &cobra.Command{
+		Use:   "counter",
+		Short: "The 'counter' command will retrieve packet counter tables from all windows nodes.",
+		Long: `The 'counter' command will retrieve packet counter tables from all windows nodes. 
+	This command requires that a capture is being run on the requested nodes. For example:
+	'winspect counter --nodes {nodes} --include-hidden`,
+		Run: func(cmd *cobra.Command, args []string) {
+			cc.printCounters()
+		},
+	}
 
-	counterCmd.PersistentFlags().StringSliceVarP(&nodes, "nodes", "n", []string{}, "Specify which nodes winspect should send requests to using node names. Runs on all windows nodes by default.")
-	counterCmd.PersistentFlags().BoolVarP(&includeHidden, "include-hidden", "i", false, "Show counters from components that are hidden by default.")
+	cmd.PersistentFlags().StringSliceVarP(&cc.nodes, "nodes", "n", []string{}, "Specify which nodes winspect should send requests to using node names. Runs on all windows nodes by default.")
+	cmd.PersistentFlags().BoolVarP(&cc.includeHidden, "include-hidden", "i", false, "Show counters from components that are hidden by default.")
+
+	cc.baseBuilderCmd = b.newBuilderCmd(cmd)
+
+	return cc
 }
 
-func getCounters(cmd *cobra.Command, args []string) {
-	nodes, err := cmd.Flags().GetStringSlice("nodes")
-	if err != nil {
-		log.Fatal(err)
-	}
+func (cc *counterCmd) printCounters() {
+	targetNodes := cc.getWinNodes()
 
-	includeHidden, err := cmd.Flags().GetBool("include-hidden")
-	if err != nil {
-		log.Fatal(err)
-	}
+	if len(cc.nodes) > 0 {
+		if err := client.ValidateNodes(cc.nodes, cc.getWinNodeNames()); err != nil {
+			log.Fatal(err)
+		}
 
-	if len(nodes) != 0 {
-		targetNodes = client.ParseValidateNodes(nodes, nodeSet)
+		targetNodes = cc.getNodes(cc.nodes)
 	}
 
 	var wg sync.WaitGroup
-	for _, ip := range targetNodes {
+	for _, node := range targetNodes {
 		wg.Add(1)
+
+		name, ip := node.GetName(), k8spi.RetrieveInternalIP(node)
 
 		c, closeClient := client.CreateConnection(ip)
 		defer closeClient()
 
-		params := client.CounterParams{Node: ip, IncludeHidden: includeHidden}
-		go client.PrintCounters(c, &params, &wg)
+		ctx := &client.ReqContext{
+			Server: client.Node{
+				Name: name,
+				Ip:   ip,
+			},
+			Wg: &wg,
+		}
+
+		req := &pb.CountersRequest{
+			IncludeHidden: cc.includeHidden,
+		}
+
+		go client.PrintCounters(c, req, ctx)
 	}
 
 	wg.Wait()

@@ -5,24 +5,28 @@ import (
 	"sync"
 
 	"github.com/microsoft/winspect/pkg/client"
+	"github.com/microsoft/winspect/pkg/k8spi"
+	pb "github.com/microsoft/winspect/rpc"
 
 	"github.com/spf13/cobra"
 )
 
-var hnsCmd = &cobra.Command{
-	Use:   "hns",
-	Short: "The 'hns' command will retrieve hns logs on all windows nodes.",
-	Long: `The 'hns' command will retrieve hns logs on all windows nodes. For example:
-'winspect hns all --nodes {nodes} --json`,
+type hnsCmd struct {
+	nodes   []string
+	verbose bool
+
+	*baseBuilderCmd
 }
 
-func init() {
-	var nodes []string
-	var verbose bool
+func (b *commandsBuilder) newHnsCmd() *hnsCmd {
+	cc := &hnsCmd{}
 
-	rootCmd.AddCommand(hnsCmd)
-	hnsCmd.PersistentFlags().StringSliceVarP(&nodes, "nodes", "n", []string{}, "Specify which nodes winspect should send requests to using node names. Runs on all windows nodes by default.")
-	hnsCmd.PersistentFlags().BoolVarP(&verbose, "json", "d", false, "Detailed option for logs.")
+	cmd := &cobra.Command{
+		Use:   "hns",
+		Short: "The 'hns' command will retrieve hns logs on all windows nodes.",
+		Long: `The 'hns' command will retrieve hns logs on all windows nodes. For example:
+	'winspect hns all --nodes {nodes} --json`,
+	}
 
 	logTypes := []string{"all", "endpoints", "loadbalancers", "namespaces", "networks"}
 	logHelp := map[string]string{
@@ -33,40 +37,59 @@ func init() {
 		"networks":      "Retrieve logs for networks on each node.",
 	}
 	for _, name := range logTypes {
-		cmd := &cobra.Command{
+		subcmd := &cobra.Command{
 			Use:   name,
 			Short: logHelp[name],
-			Run:   getLogs,
+			Run: func(cmd *cobra.Command, args []string) {
+				cc.printLogs(cmd.Name())
+			},
 		}
 
-		hnsCmd.AddCommand(cmd)
+		cmd.AddCommand(subcmd)
 	}
+
+	cmd.PersistentFlags().StringSliceVarP(&cc.nodes, "nodes", "n", []string{}, "Specify which nodes winspect should send requests to using node names. Runs on all windows nodes by default.")
+	cmd.PersistentFlags().BoolVarP(&cc.verbose, "json", "d", false, "Detailed option for logs.")
+
+	cc.baseBuilderCmd = b.newBuilderCmd(cmd)
+
+	return cc
 }
 
-func getLogs(cmd *cobra.Command, args []string) {
-	nodes, err := cmd.Flags().GetStringSlice("nodes")
-	if err != nil {
-		log.Fatal(err)
-	}
+func (cc *hnsCmd) printLogs(subcmd string) {
+	targetNodes := cc.getWinNodes()
 
-	verbose, err := cmd.Flags().GetBool("json")
-	if err != nil {
-		log.Fatal(err)
-	}
+	if len(cc.nodes) != 0 {
+		if err := client.ValidateNodes(cc.nodes, cc.getWinNodeNames()); err != nil {
+			log.Fatal(err)
+		}
 
-	if len(nodes) != 0 {
-		targetNodes = client.ParseValidateNodes(nodes, nodeSet)
+		targetNodes = cc.getNodes(cc.nodes)
 	}
 
 	var wg sync.WaitGroup
-	for _, ip := range targetNodes {
+	for _, node := range targetNodes {
 		wg.Add(1)
+
+		name, ip := node.GetName(), k8spi.RetrieveInternalIP(node)
 
 		c, closeClient := client.CreateConnection(ip)
 		defer closeClient()
 
-		params := client.HCNParams{Cmd: cmd.Name(), Node: ip, Verbose: verbose}
-		go client.PrintHCNLogs(c, &params, &wg)
+		ctx := &client.ReqContext{
+			Server: client.Node{
+				Name: name,
+				Ip:   ip,
+			},
+			Wg: &wg,
+		}
+
+		req := &pb.HCNRequest{
+			Hcntype: pb.HCNType(pb.HCNType_value[subcmd]),
+			Verbose: cc.verbose,
+		}
+
+		go client.PrintHCNLogs(c, req, ctx)
 	}
 
 	wg.Wait()
