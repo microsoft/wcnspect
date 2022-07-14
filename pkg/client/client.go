@@ -12,6 +12,7 @@ import (
 	pb "github.com/microsoft/winspect/rpc"
 
 	"google.golang.org/grpc"
+	"google.golang.org/grpc/credentials/insecure"
 	"google.golang.org/protobuf/types/known/timestamppb"
 	v1 "k8s.io/api/core/v1"
 )
@@ -39,8 +40,7 @@ func (rq *ReqContext) Done() {
 
 func CreateConnection(ip string) (*client, func() error) {
 	//FIXME: hardcoded port addition
-	// also using grpc.WithInsecure, but way smaller priority
-	cc, err := grpc.Dial(ip+":"+common.DefaultServerPort, grpc.WithInsecure())
+	cc, err := grpc.Dial(ip+":"+common.DefaultServerPort, grpc.WithTransportCredentials(insecure.NewCredentials()))
 	if err != nil {
 		log.Fatalf("could not connect: %v", err)
 	}
