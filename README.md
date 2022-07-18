@@ -3,6 +3,7 @@
 Currently, this project makes the following assumptions:
 
 * The port that winspect server nodes use is 50051.
+* When applying `winspectserv-daemon.yml`, the user has access to the referenced acr.
 
 ## Contributing
 
