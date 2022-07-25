@@ -110,7 +110,7 @@ Importantly, while the `vfp-counter` command runs on its own (given a pod), the 
 Currently, this project's code makes the following assumptions:
 
 * The port that winspect server nodes use is 50051 (assumed on client side).
-* When applying `winspectserv-daemon.yml`, the user has access to ACR referenced in the file.
+* When applying `winspectserv-daemon.yml`, the user has access to the ACR referenced in the file.
 
 ## Contributing
 
