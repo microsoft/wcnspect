@@ -2,52 +2,6 @@
 
 > A network inspector for the Windows container networking stack on Kubernetes
 
-## Example
-
-If you decide not to deploy the server as a container and manually download it to a node, then it must be run from an Admin CLS with:
-
-> running on the default port of 50051
-
-```shell
-./winspectserv
-```
-
-The winspect tool pulls on the user's `.kube` config file and the `default` namespace. By default, most commands pull information from all windows nodes.
-Consequently, when using commands, the user should reference node names and pod names for better filtering of results.
-
-> in-depth documentation and examples are available with the -h flag on any command
-
-```shell
-./winspect -h
-./winspect capture -h
-./winspect hns all -h
-```
-
-For commands that accept lists, input should be comma-separated and without spaces. For example, if we want to capture for 10 seconds on nodes named `win1`, `win2`, and `win3`, while also filtering only for TCP packets, we could do the following:
-
-> sample capture command
-
-```shell
-./winspect capture nodes win1,win2,win3 -t TCP -d 10
-```
-
-The command will be routed to each node's internal IP on the cluster. It should be noted that if we don't pass a duration, the command will run indefinitely. Additionally, we can terminate the process on the referenced nodes at any time with `Ctrl+C`.
-
-Note that if we pass the `--counters-only` flag to the `capture` command, then packet output won't be displayed and the counter table will only be displayed once the command is finished running.
-
-> sample capture command using --counters-only
-
-```shell
-./winspect capture nodes win1 --counters-only
-```
-
-Importantly, while the `vfp-counter` command runs on its own (given a pod), the `counter` command is tied to running instances of the `capture` command. Consequently, in order for it to output a table on any given node, a capture must be run on that node at the same time. The table will output packet counts tied to that capture.
-
-```shell
-./winspect capture nodes win1,win3 -t TCP
-./winspect counter
-```
-
 ## Installation
 
 After cloning this repo and installing its dependencies with Go, refer to the following:
@@ -94,6 +48,61 @@ It should be noted that the port on which the server runs can be changed by modi
 
 ```shell
 ./winspectserv -p 43058
+```
+
+## Features
+
+Currently, the winspect tool features four commands -
+
+* Capture: runs a packet capture on windows nodes, Has the capability to filter on pods, IPs, MACs, ports, protocols, and packet type (all, flow, or drop).
+* Counter: will retrieve packet counter tables from windows nodes. It only outputs a table on nodes currently running a capture.
+* Vfp-counter: will retrieve packet counter tables from the specified pod's Port VFP. If specified, the pod's Host vNIC Port VFP and External Adapter Port VFP.
+* Hns: will retrieve HNS logs from windows nodes. Can specify all, endpoints, loadbalancers, namespaces, or networks. Can request json output. 
+
+## Example
+
+If you decide not to deploy the server as a container and manually download it to a node, then it must be run from a CLS with Admin permissions:
+
+> running on the default port of 50051
+
+```shell
+./winspectserv
+```
+
+The winspect tool pulls on the user's `.kube` config file and the `default` namespace. By default, most commands pull information from all windows nodes.
+Consequently, when using commands, the user should reference node names and pod names for better filtering of results.
+
+> in-depth documentation and examples are available with the -h flag on any command
+
+```shell
+./winspect -h
+./winspect capture -h
+./winspect hns all -h
+```
+
+For commands that accept lists, input should be comma-separated and without spaces. For example, if we want to capture for 10 seconds on nodes named `win1`, `win2`, and `win3`, while also filtering only for TCP packets, we could do the following:
+
+> sample capture command
+
+```shell
+./winspect capture nodes win1,win2,win3 -t TCP -d 10
+```
+
+The command will be routed to each node's internal IP on the cluster. It should be noted that if we don't pass a duration, the command will run indefinitely. Additionally, we can terminate the process on the referenced nodes at any time with `Ctrl+C`.
+
+Note that if we pass the `--counters-only` flag to the `capture` command, then packet output won't be displayed and the counter table will only be displayed once the command is finished running.
+
+> sample capture command using --counters-only
+
+```shell
+./winspect capture nodes win1 --counters-only
+```
+
+Importantly, while the `vfp-counter` command runs on its own (given a pod), the `counter` command is tied to running instances of the `capture` command. Consequently, in order for it to output a table on any given node, a capture must be run on that node at the same time. The table will output packet counts tied to that capture.
+
+```shell
+./winspect capture nodes win1,win3 -t TCP
+./winspect counter
 ```
 
 ## Assumptions
