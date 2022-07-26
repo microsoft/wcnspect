@@ -1,9 +1,11 @@
+// Copyright (c) Microsoft Corporation.
+// Licensed under the MIT license.
+
 syntax = "proto3";
 option go_package = "github.com/microsoft/winspect/rpc";
 package winspect.captures;
 
 import "google/protobuf/timestamp.proto";
-
 
 // models
 message Filters {
