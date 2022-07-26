@@ -1,8 +1,11 @@
+// Copyright (c) Microsoft Corporation.
+// Licensed under the MIT license.
+
 syntax = "proto3";
 option go_package = "github.com/microsoft/winspect/rpc";
 package winspect.hcn;
 
-
+// models
 enum HCNType {
 	all = 0;
 	endpoints = 1;
