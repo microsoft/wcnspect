@@ -4,11 +4,11 @@
 
 ## Installation
 
-After cloning this repo and installing its dependencies with Go, refer to the following:
+This project requires `Go 1.18`. After cloning this repo and installing its dependencies with Go, refer to the following:
 
 ### Building the Client and Server
 
-All executables will be placed in `./out/bin`.
+All executables will be placed in `./out/bin`. Upon making the client, two executables will be built: one for Windows and one for Linux.
 
 > to build the client and server
 
@@ -29,14 +29,29 @@ make client
 make server
 ```
 
+It should be noted that while the client is cross-platform, the server can only run on Windows.
+
 ### Building and Deploying the Server as a Container
 
-Currently, deploying the server executable on a cluster entails creating an image for it and passing this to the daemonset `.yml` file in `manifest`, then applying it. The most convient way to do this, as of now, is for the user to create their own Azure Container Registry (ACR) and upload the image through there.
+Currently, deploying the server executable on a cluster entails creating an image for it and passing this to the [daemonset file](manifest/winspectserv-daemon.yml) in `manifest`, then applying it. The most convient way to do this, as of now, is for the user to create their own Azure Container Registry (ACR) and upload the image through there.
 
 The steps for using ACR are outlined <a href="https://docs.microsoft.com/en-us/azure/container-registry/container-registry-tutorial-quick-task" target="_blank">in these docs.</a>
-The Dockerfile used for the original image is also contained in `manifest`.
+The [Dockerfile](manifest/Dockerfile) used for the original image is also contained in `manifest`. 
 
-It should be noted that the port on which the server runs can be changed by modifying the command input to the daemonset file in `manifest`. For example:
+Note that the `manifest` directory also contains sample web server deployments for WS2019 and WS2022.
+
+## Features
+
+Currently, the winspect tool features four commands -
+
+* Capture: runs a packet capture on windows nodes, Has the capability to filter on pods, IPs, MACs, ports, protocols, and packet type (all, flow, or drop).
+* Counter: will retrieve packet counter tables from windows nodes. It only outputs a table on nodes currently running a capture.
+* Vfp-counter: will retrieve packet counter tables from the specified pod's Port VFP. If specified, the pod's Host vNIC Port VFP and External Adapter Port VFP.
+* Hns: will retrieve HNS logs from windows nodes. Can specify all, endpoints, loadbalancers, namespaces, or networks. Can request json output. 
+
+## Example
+
+If you decide not to deploy the server as a container and manually download it to a node, then it must be run from a CLS with Admin permissions. It should be noted that the port on which the server runs can be changed by modifying the port flag. For example:
 
 > running on the default port of 50051
 
@@ -50,24 +65,7 @@ It should be noted that the port on which the server runs can be changed by modi
 ./winspectserv -p 43058
 ```
 
-## Features
-
-Currently, the winspect tool features four commands -
-
-* Capture: runs a packet capture on windows nodes, Has the capability to filter on pods, IPs, MACs, ports, protocols, and packet type (all, flow, or drop).
-* Counter: will retrieve packet counter tables from windows nodes. It only outputs a table on nodes currently running a capture.
-* Vfp-counter: will retrieve packet counter tables from the specified pod's Port VFP. If specified, the pod's Host vNIC Port VFP and External Adapter Port VFP.
-* Hns: will retrieve HNS logs from windows nodes. Can specify all, endpoints, loadbalancers, namespaces, or networks. Can request json output. 
-
-## Example
-
-If you decide not to deploy the server as a container and manually download it to a node, then it must be run from a CLS with Admin permissions:
-
-> running on the default port of 50051
-
-```shell
-./winspectserv
-```
+Note this can be changed in the [manifest file](manifest/winspectserv-daemon.yml) in the `command` section when deploying the server as a container.
 
 The winspect tool pulls on the user's `.kube` config file and the `default` namespace. By default, most commands pull information from all windows nodes.
 Consequently, when using commands, the user should reference node names and pod names for better filtering of results.
@@ -109,7 +107,7 @@ Importantly, while the `vfp-counter` command runs on its own (given a pod), the 
 
 Currently, this project's code makes the following assumptions:
 
-* The port that winspect server nodes use is 50051 (assumed on client side).
+* The port that winspect server nodes use is 50051 (this is currently required on client-side).
 * When applying `winspectserv-daemon.yml`, the user has access to the ACR referenced in the file.
 
 ## Contributing
