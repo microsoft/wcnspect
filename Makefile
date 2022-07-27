@@ -1,11 +1,21 @@
+
+FLAG 				:=
+ifeq ($(OS),Windows_NT)
+	FLAG += set
+	CLEAN = rmdir /S /q .\out
+else
+	CLEAN = rm -f out
+endif
+
 ## Build:
-client: ## Build client executable
-	go build -o out/bin/winspect.exe ./cmd/winspect/
-
-server: ## Build server executable
-	go build -o out/bin/winspectserv.exe ./cmd/winspectserv/
-
 all: client server ## Build all executables
 
+client: ## Build windows and linux client executables
+	$(FLAG) "GOARCH=amd64" && $(FLAG) "GOOS=windows" && go build -o out/bin/winspect.exe ./cmd/winspect/
+	$(FLAG) "GOARCH=amd64" && $(FLAG) "GOOS=linux" && go build -o out/bin/winspect ./cmd/winspect/
+
+server: ## Build server executable
+	$(FLAG) "GOARCH=amd64" && $(FLAG) "GOOS=windows" && go build -o out/bin/winspectserv.exe ./cmd/winspectserv/
+
 clean: ## Remove build related files
-	rmdir /S /q .\out
+	$(CLEAN)
