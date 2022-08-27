@@ -1,0 +1,81 @@
+// Copyright (c) Microsoft Corporation.
+// Licensed under the MIT license.
+
+syntax = "proto3";
+option go_package = "github.com/microsoft/winspect/rpc";
+package winspect.captures;
+
+import "google/protobuf/timestamp.proto";
+
+// models
+message Filters {
+	repeated string ips = 2;
+	repeated string protocols = 3;
+	repeated string ports = 4;
+	repeated string macs = 5;
+}
+
+message Modifiers {
+	repeated string pods = 1;
+	PacketType packet_type = 4;
+	bool counters_only = 5;
+}
+
+enum PacketType {
+	all = 0;
+	flow = 1;
+	drop = 2;
+}
+
+message Empty {
+
+}
+
+// requests
+message CaptureRequest {
+	int32 duration = 1;
+	google.protobuf.Timestamp timestamp = 2;
+	Modifiers modifier = 3;
+	Filters filter = 4;
+}
+
+message CountersRequest {
+	bool include_hidden = 1;
+}
+
+message VFPCountersRequest {
+	string pod = 1;
+	bool verbose = 2;
+}
+
+// responses
+message CaptureResponse {
+	string result = 1;
+	google.protobuf.Timestamp timestamp = 2;
+}
+
+message StopCaptureResponse {
+	string result = 1;
+	google.protobuf.Timestamp timestamp = 2;
+}
+
+message CountersResponse {
+	string result = 1;
+	google.protobuf.Timestamp timestamp = 2;
+}
+
+message VFPCountersResponse {
+	string result = 1;
+	google.protobuf.Timestamp timestamp = 2;
+}
+
+// service
+service CaptureService {
+	rpc StartCapture(CaptureRequest) returns (stream CaptureResponse) {}
+
+	rpc StopCapture(Empty) returns (StopCaptureResponse) {}
+
+	rpc GetCounters(CountersRequest) returns (CountersResponse) {}
+
+	rpc GetVFPCounters(VFPCountersRequest) returns (VFPCountersResponse) {}
+}

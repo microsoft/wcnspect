@@ -1,0 +1,43 @@
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  labels:
+    app: winspect-server
+  name: winspect-server
+  namespace: kube-system
+spec:
+  selector:
+    matchLabels:
+      app: winspect-server
+  template:
+    metadata:
+      labels:
+        app: winspect-server
+      name: winspect-server
+      namespace: kube-system
+    spec:
+      tolerations:
+      - key: node-role.kubernetes.io/control-plane
+        operator: Exists
+        effect: NoSchedule
+      - key: node-role.kubernetes.io/master
+        operator: Exists
+        effect: NoSchedule
+      securityContext:
+        windowsOptions:
+          hostProcess: true
+          runAsUserName: "NT AUTHORITY\\SYSTEM"
+        runAsNonRoot: false
+      hostNetwork: true
+      containers:
+      - name: windowswinspectserver
+        image: nikosacr.azurecr.io/winspect:latest
+        command:
+        - powershell.exe
+        - -command
+        - ./winspectserv.exe # can add `-p {num}` here to change server's port
+        securityContext:
+          privileged: true
+      nodeSelector:
+        kubernetes.io/os: windows
+ 

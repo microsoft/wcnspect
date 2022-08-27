@@ -1,0 +1,31 @@
+// Copyright (c) Microsoft Corporation.
+// Licensed under the MIT license.
+
+syntax = "proto3";
+option go_package = "github.com/microsoft/winspect/rpc";
+package winspect.hcn;
+
+// models
+enum HCNType {
+	all = 0;
+	endpoints = 1;
+	loadbalancers = 2;
+	namespaces = 3;
+	networks = 4;
+}
+
+// requests
+message HCNRequest {
+	HCNType hcntype = 1;
+	bool verbose = 2;
+}
+
+// responses
+message HCNResponse {
+	bytes hcn_result = 1;
+}
+
+// service
+service HCNService {
+	rpc GetHCNLogs(HCNRequest) returns (HCNResponse) {}
+}
