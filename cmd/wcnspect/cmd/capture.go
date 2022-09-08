@@ -11,9 +11,9 @@ import (
 	"sync"
 	"syscall"
 
-	"github.com/microsoft/winspect/pkg/client"
-	"github.com/microsoft/winspect/pkg/k8spi"
-	pb "github.com/microsoft/winspect/rpc"
+	"github.com/microsoft/wcnspect/pkg/client"
+	"github.com/microsoft/wcnspect/pkg/k8spi"
+	pb "github.com/microsoft/wcnspect/rpc"
 
 	"github.com/spf13/cobra"
 )
@@ -39,13 +39,13 @@ func (b *commandsBuilder) newCaptureCmd() *captureCmd {
 		Use:   "capture",
 		Short: "The 'capture' command will run a packet capture on all windows nodes.",
 		Long: `The 'capture' command will run a packet capture on all windows nodes. For example:
-	'winspect capture pods {pods} --protocols TCP -d 10'.`,
+	'wcnspect capture pods {pods} --protocols TCP -d 10'.`,
 	}
 
 	captureTypes := []string{"all", "nodes", "pods"}
 	captureHelp := map[string]string{
 		"all":   "Runs on all windows nodes in the AKS cluster.",
-		"nodes": "Specify which nodes winspect should send requests to using node names.",
+		"nodes": "Specify which nodes wcnspect should send requests to using node names.",
 		"pods":  "Specify which pods the capture should filter on. Supports up to two pod names. Automatically defines nodes to capture on.",
 	}
 	for _, name := range captureTypes {
@@ -85,7 +85,7 @@ func (cc *captureCmd) printCapture(subcmd string, endpoints []string) {
 	switch subcmd {
 	case "nodes":
 		if len(endpoints) == 0 {
-			log.Fatal("must pass node names when using 'winspect capture nodes ...'")
+			log.Fatal("must pass node names when using 'wcnspect capture nodes ...'")
 		}
 
 		nodes := strings.Split(endpoints[0], ",")
@@ -96,7 +96,7 @@ func (cc *captureCmd) printCapture(subcmd string, endpoints []string) {
 		targetNodes = cc.getNodes(nodes)
 	case "pods":
 		if len(endpoints) == 0 {
-			log.Fatal("must pass pod names when using 'winspect capture pods ...'")
+			log.Fatal("must pass pod names when using 'wcnspect capture pods ...'")
 		}
 
 		pods := strings.Split(endpoints[0], ",")

@@ -9,9 +9,9 @@ import (
 	"net"
 	"strconv"
 
-	"github.com/microsoft/winspect/common"
-	"github.com/microsoft/winspect/pkg/server"
-	pb "github.com/microsoft/winspect/rpc"
+	"github.com/microsoft/wcnspect/common"
+	"github.com/microsoft/wcnspect/pkg/server"
+	pb "github.com/microsoft/wcnspect/rpc"
 
 	flag "github.com/spf13/pflag"
 	"google.golang.org/grpc"

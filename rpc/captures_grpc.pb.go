@@ -33,7 +33,7 @@ func NewCaptureServiceClient(cc grpc.ClientConnInterface) CaptureServiceClient {
 }
 
 func (c *captureServiceClient) StartCapture(ctx context.Context, in *CaptureRequest, opts ...grpc.CallOption) (CaptureService_StartCaptureClient, error) {
-	stream, err := c.cc.NewStream(ctx, &CaptureService_ServiceDesc.Streams[0], "/winspect.captures.CaptureService/StartCapture", opts...)
+	stream, err := c.cc.NewStream(ctx, &CaptureService_ServiceDesc.Streams[0], "/wcnspect.captures.CaptureService/StartCapture", opts...)
 	if err != nil {
 		return nil, err
 	}
@@ -66,7 +66,7 @@ func (x *captureServiceStartCaptureClient) Recv() (*CaptureResponse, error) {
 
 func (c *captureServiceClient) StopCapture(ctx context.Context, in *Empty, opts ...grpc.CallOption) (*StopCaptureResponse, error) {
 	out := new(StopCaptureResponse)
-	err := c.cc.Invoke(ctx, "/winspect.captures.CaptureService/StopCapture", in, out, opts...)
+	err := c.cc.Invoke(ctx, "/wcnspect.captures.CaptureService/StopCapture", in, out, opts...)
 	if err != nil {
 		return nil, err
 	}
@@ -75,7 +75,7 @@ func (c *captureServiceClient) StopCapture(ctx context.Context, in *Empty, opts 
 
 func (c *captureServiceClient) GetCounters(ctx context.Context, in *CountersRequest, opts ...grpc.CallOption) (*CountersResponse, error) {
 	out := new(CountersResponse)
-	err := c.cc.Invoke(ctx, "/winspect.captures.CaptureService/GetCounters", in, out, opts...)
+	err := c.cc.Invoke(ctx, "/wcnspect.captures.CaptureService/GetCounters", in, out, opts...)
 	if err != nil {
 		return nil, err
 	}
@@ -84,7 +84,7 @@ func (c *captureServiceClient) GetCounters(ctx context.Context, in *CountersRequ
 
 func (c *captureServiceClient) GetVFPCounters(ctx context.Context, in *VFPCountersRequest, opts ...grpc.CallOption) (*VFPCountersResponse, error) {
 	out := new(VFPCountersResponse)
-	err := c.cc.Invoke(ctx, "/winspect.captures.CaptureService/GetVFPCounters", in, out, opts...)
+	err := c.cc.Invoke(ctx, "/wcnspect.captures.CaptureService/GetVFPCounters", in, out, opts...)
 	if err != nil {
 		return nil, err
 	}
@@ -162,7 +162,7 @@ func _CaptureService_StopCapture_Handler(srv interface{}, ctx context.Context, d
 	}
 	info := &grpc.UnaryServerInfo{
 		Server:     srv,
-		FullMethod: "/winspect.captures.CaptureService/StopCapture",
+		FullMethod: "/wcnspect.captures.CaptureService/StopCapture",
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
 		return srv.(CaptureServiceServer).StopCapture(ctx, req.(*Empty))
@@ -180,7 +180,7 @@ func _CaptureService_GetCounters_Handler(srv interface{}, ctx context.Context, d
 	}
 	info := &grpc.UnaryServerInfo{
 		Server:     srv,
-		FullMethod: "/winspect.captures.CaptureService/GetCounters",
+		FullMethod: "/wcnspect.captures.CaptureService/GetCounters",
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
 		return srv.(CaptureServiceServer).GetCounters(ctx, req.(*CountersRequest))
@@ -198,7 +198,7 @@ func _CaptureService_GetVFPCounters_Handler(srv interface{}, ctx context.Context
 	}
 	info := &grpc.UnaryServerInfo{
 		Server:     srv,
-		FullMethod: "/winspect.captures.CaptureService/GetVFPCounters",
+		FullMethod: "/wcnspect.captures.CaptureService/GetVFPCounters",
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
 		return srv.(CaptureServiceServer).GetVFPCounters(ctx, req.(*VFPCountersRequest))
@@ -210,7 +210,7 @@ func _CaptureService_GetVFPCounters_Handler(srv interface{}, ctx context.Context
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
 var CaptureService_ServiceDesc = grpc.ServiceDesc{
-	ServiceName: "winspect.captures.CaptureService",
+	ServiceName: "wcnspect.captures.CaptureService",
 	HandlerType: (*CaptureServiceServer)(nil),
 	Methods: []grpc.MethodDesc{
 		{

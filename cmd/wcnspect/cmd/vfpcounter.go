@@ -7,9 +7,9 @@ import (
 	"log"
 	"sync"
 
-	"github.com/microsoft/winspect/pkg/client"
-	"github.com/microsoft/winspect/pkg/k8spi"
-	pb "github.com/microsoft/winspect/rpc"
+	"github.com/microsoft/wcnspect/pkg/client"
+	"github.com/microsoft/wcnspect/pkg/k8spi"
+	pb "github.com/microsoft/wcnspect/rpc"
 
 	"github.com/spf13/cobra"
 )
@@ -29,13 +29,13 @@ func (b *commandsBuilder) newVfpCounterCmd() *vfpCounterCmd {
 		Short: "The 'vfp-counter' command will retrieve packet counter tables from a specified windows pod's port VFP.",
 		Long: `The 'vfp-counter' command will retrieve packet counter tables from a specified windows pod's port VFP. 
 	For example:
-	'winspect vfp-counter --pod {pod}'`,
+	'wcnspect vfp-counter --pod {pod}'`,
 		Run: func(cmd *cobra.Command, args []string) {
 			cc.printVFPCounters()
 		},
 	}
 
-	cmd.PersistentFlags().StringVarP(&cc.pod, "pod", "p", "", "Specify which pod winspect should send requests to using pod name. This flag is required.")
+	cmd.PersistentFlags().StringVarP(&cc.pod, "pod", "p", "", "Specify which pod wcnspect should send requests to using pod name. This flag is required.")
 	cmd.PersistentFlags().BoolVarP(&cc.verbose, "detailed", "d", false, "Option to output Host vNic and External Adapter Port counters.")
 	cmd.MarkPersistentFlagRequired("pod")
 

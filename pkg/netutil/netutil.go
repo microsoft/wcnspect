@@ -53,7 +53,7 @@ func GetLogs(option string, verbose bool) ([]byte, error) {
 	cmd := fmt.Sprintf("hnsdiag list %s", option)
 
 	if verbose {
-		cmd += " -d"
+		cmd += " -dl"
 	}
 
 	return exec.Command("cmd", "/c", cmd).CombinedOutput()

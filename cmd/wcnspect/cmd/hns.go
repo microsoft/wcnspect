@@ -7,9 +7,9 @@ import (
 	"log"
 	"sync"
 
-	"github.com/microsoft/winspect/pkg/client"
-	"github.com/microsoft/winspect/pkg/k8spi"
-	pb "github.com/microsoft/winspect/rpc"
+	"github.com/microsoft/wcnspect/pkg/client"
+	"github.com/microsoft/wcnspect/pkg/k8spi"
+	pb "github.com/microsoft/wcnspect/rpc"
 
 	"github.com/spf13/cobra"
 )
@@ -28,7 +28,7 @@ func (b *commandsBuilder) newHnsCmd() *hnsCmd {
 		Use:   "hns",
 		Short: "The 'hns' command will retrieve hns logs on all windows nodes.",
 		Long: `The 'hns' command will retrieve hns logs on all windows nodes. For example:
-	'winspect hns all --nodes {nodes} --json`,
+	'wcnspect hns all --nodes {nodes} --json`,
 	}
 
 	logTypes := []string{"all", "endpoints", "loadbalancers", "namespaces", "networks"}
@@ -51,7 +51,7 @@ func (b *commandsBuilder) newHnsCmd() *hnsCmd {
 		cmd.AddCommand(subcmd)
 	}
 
-	cmd.PersistentFlags().StringSliceVarP(&cc.nodes, "nodes", "n", []string{}, "Specify which nodes winspect should send requests to using node names. Runs on all windows nodes by default.")
+	cmd.PersistentFlags().StringSliceVarP(&cc.nodes, "nodes", "n", []string{}, "Specify which nodes wcnspect should send requests to using node names. Runs on all windows nodes by default.")
 	cmd.PersistentFlags().BoolVarP(&cc.verbose, "json", "d", false, "Detailed option for logs.")
 
 	cc.baseBuilderCmd = b.newBuilderCmd(cmd)

@@ -9,8 +9,8 @@ import (
 )
 
 func Execute() {
-	winspectCmd := newCommandsBuilder().addAll().build()
-	cmd := winspectCmd.getCommand()
+	wcnspectCmd := newCommandsBuilder().addAll().build()
+	cmd := wcnspectCmd.getCommand()
 
 	if err := cmd.Execute(); err != nil {
 		fmt.Println(err)

@@ -9,8 +9,8 @@ import (
 	"net"
 	"testing"
 
-	"github.com/microsoft/winspect/pkg/netutil"
-	pb "github.com/microsoft/winspect/rpc"
+	"github.com/microsoft/wcnspect/pkg/netutil"
+	pb "github.com/microsoft/wcnspect/rpc"
 
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/test/bufconn"

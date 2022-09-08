@@ -1,6 +1,6 @@
 ---
 name: Bug report
-about: Create a report to help us improve winspect
+about: Create a report to help us improve wcnspect
 title: ''
 labels: ''
 assignees: ''
@@ -11,7 +11,7 @@ assignees: ''
 A clear and concise description of what the bug is.
 
 **Component:**
-Is the issue in the Winspect Client, the Server, or both?
+Is the issue in the wcnspect Client, the Server, or both?
 
 **To Reproduce**
 Steps to reproduce the behavior.

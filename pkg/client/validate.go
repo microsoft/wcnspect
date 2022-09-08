@@ -9,8 +9,8 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/microsoft/winspect/common"
-	"github.com/microsoft/winspect/pkg/comprise"
+	"github.com/microsoft/wcnspect/common"
+	"github.com/microsoft/wcnspect/pkg/comprise"
 )
 
 var validTCPFormats = comprise.Map(strings.Split(common.ValidTCPFlags, " "), func(s string) string { return "TCP_" + s })

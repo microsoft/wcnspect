@@ -9,7 +9,7 @@ import (
 	"regexp"
 	"strings"
 
-	"github.com/microsoft/winspect/pkg/netutil"
+	"github.com/microsoft/wcnspect/pkg/netutil"
 )
 
 type VFPPort struct {

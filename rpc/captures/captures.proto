@@ -2,8 +2,8 @@
 // Licensed under the MIT license.
 
 syntax = "proto3";
-option go_package = "github.com/microsoft/winspect/rpc";
-package winspect.captures;
+option go_package = "github.com/microsoft/wcnspect/rpc";
+package wcnspect.captures;
 
 import "google/protobuf/timestamp.proto";
 
