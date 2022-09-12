@@ -11,7 +11,7 @@ import (
 	"sync"
 
 	"github.com/microsoft/wcnspect/common"
-	"github.com/microsoft/wcnspect/pkg/k8spi"
+	"github.com/microsoft/wcnspect/pkg/k8sapi"
 	pb "github.com/microsoft/wcnspect/rpc"
 
 	"google.golang.org/grpc"
@@ -160,7 +160,7 @@ func Cleanup(nodes []v1.Node) {
 		wg.Add(1)
 
 		// Get target name and ip
-		name, ip := node.GetName(), k8spi.RetrieveInternalIP(node)
+		name, ip := node.GetName(), k8sapi.RetrieveInternalIP(node)
 
 		// Create connections
 		c, closeClient := CreateConnection(ip)

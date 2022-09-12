@@ -8,7 +8,7 @@ import (
 	"sync"
 
 	"github.com/microsoft/wcnspect/pkg/client"
-	"github.com/microsoft/wcnspect/pkg/k8spi"
+	"github.com/microsoft/wcnspect/pkg/k8sapi"
 	pb "github.com/microsoft/wcnspect/rpc"
 
 	"github.com/spf13/cobra"
@@ -58,7 +58,7 @@ func (cc *counterCmd) printCounters() {
 	for _, node := range targetNodes {
 		wg.Add(1)
 
-		name, ip := node.GetName(), k8spi.RetrieveInternalIP(node)
+		name, ip := node.GetName(), k8sapi.RetrieveInternalIP(node)
 
 		c, closeClient := client.CreateConnection(ip)
 		defer closeClient()

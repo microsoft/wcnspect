@@ -70,7 +70,9 @@ If you decide not to deploy the server as a container and manually download it t
 ## Wcnspect Client
 The client needs to be executed as a standalone binary from either a Windows or a Linux VM in the same network (jumpbox).
 
-The wcnspect client reads in the user's `.kube` config file and uses the `default` namespace. 
+The wcnspect client requires access to the [Kubernetes cluster config](https://kubernetes.io/docs/concepts/configuration/organize-cluster-access-kubeconfig/). 
+
+By default, Wcnspect client will search for a file named `config` in the `$HOME/.kube` directory. Otherwise, it will use the $KUBECONFIG environment variable.
 
 By default, most commands pull information from *all* Windows nodes.
 Consequently, when using commands, the user should reference node names and pod names for better filtering of results.
@@ -116,9 +118,7 @@ Currently, this project's code makes the following assumptions:
 * When applying `wcnspectserv-daemon.yml`, the user has access to the ACR referenced in the file.
 
 ## TODO
-  * Read in `$KUBECONFIG` env var.
-  * Support for other ports on client side.
-  * Namespace support for pods.
+  * Support for other ports on the Wcnspect client.
 
 
 ## Contributing
