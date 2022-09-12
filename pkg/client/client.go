@@ -10,9 +10,9 @@ import (
 	"log"
 	"sync"
 
-	"github.com/microsoft/winspect/common"
-	"github.com/microsoft/winspect/pkg/k8spi"
-	pb "github.com/microsoft/winspect/rpc"
+	"github.com/microsoft/wcnspect/common"
+	"github.com/microsoft/wcnspect/pkg/k8sapi"
+	pb "github.com/microsoft/wcnspect/rpc"
 
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
@@ -160,7 +160,7 @@ func Cleanup(nodes []v1.Node) {
 		wg.Add(1)
 
 		// Get target name and ip
-		name, ip := node.GetName(), k8spi.RetrieveInternalIP(node)
+		name, ip := node.GetName(), k8sapi.RetrieveInternalIP(node)
 
 		// Create connections
 		c, closeClient := CreateConnection(ip)

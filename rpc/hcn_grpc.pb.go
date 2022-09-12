@@ -31,7 +31,7 @@ func NewHCNServiceClient(cc grpc.ClientConnInterface) HCNServiceClient {
 
 func (c *hCNServiceClient) GetHCNLogs(ctx context.Context, in *HCNRequest, opts ...grpc.CallOption) (*HCNResponse, error) {
 	out := new(HCNResponse)
-	err := c.cc.Invoke(ctx, "/winspect.hcn.HCNService/GetHCNLogs", in, out, opts...)
+	err := c.cc.Invoke(ctx, "/wcnspect.hcn.HCNService/GetHCNLogs", in, out, opts...)
 	if err != nil {
 		return nil, err
 	}
@@ -76,7 +76,7 @@ func _HCNService_GetHCNLogs_Handler(srv interface{}, ctx context.Context, dec fu
 	}
 	info := &grpc.UnaryServerInfo{
 		Server:     srv,
-		FullMethod: "/winspect.hcn.HCNService/GetHCNLogs",
+		FullMethod: "/wcnspect.hcn.HCNService/GetHCNLogs",
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
 		return srv.(HCNServiceServer).GetHCNLogs(ctx, req.(*HCNRequest))
@@ -88,7 +88,7 @@ func _HCNService_GetHCNLogs_Handler(srv interface{}, ctx context.Context, dec fu
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
 var HCNService_ServiceDesc = grpc.ServiceDesc{
-	ServiceName: "winspect.hcn.HCNService",
+	ServiceName: "wcnspect.hcn.HCNService",
 	HandlerType: (*HCNServiceServer)(nil),
 	Methods: []grpc.MethodDesc{
 		{

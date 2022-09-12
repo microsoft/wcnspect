@@ -1,4 +1,4 @@
-module github.com/microsoft/winspect
+module github.com/microsoft/wcnspect
 
 go 1.18
 

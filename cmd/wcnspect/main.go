@@ -4,7 +4,7 @@
 package main
 
 import (
-	"github.com/microsoft/winspect/cmd/winspect/cmd"
+	"github.com/microsoft/wcnspect/cmd/wcnspect/cmd"
 )
 
 func main() {

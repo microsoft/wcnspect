@@ -6,7 +6,7 @@ package pkt
 import (
 	"testing"
 
-	pb "github.com/microsoft/winspect/rpc"
+	pb "github.com/microsoft/wcnspect/rpc"
 )
 
 func TestAddFilters(t *testing.T) {

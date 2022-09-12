@@ -11,9 +11,9 @@ import (
 	"os/exec"
 	"strings"
 
-	"github.com/microsoft/winspect/pkg/comprise"
-	"github.com/microsoft/winspect/pkg/netutil"
-	pb "github.com/microsoft/winspect/rpc"
+	"github.com/microsoft/wcnspect/pkg/comprise"
+	"github.com/microsoft/wcnspect/pkg/netutil"
+	pb "github.com/microsoft/wcnspect/rpc"
 )
 
 var pktParams = map[string]string{
@@ -41,7 +41,7 @@ func AddFilters(filters *pb.Filters) error {
 	pktProtocols := comprise.Map(protocols, formatTCPFlags)
 
 	for i, protocol := range protocols {
-		name := "winspect" + strings.ToUpper(protocol)
+		name := "wcnspect" + strings.ToUpper(protocol)
 		filterBuilder := []string{}
 
 		// Build filter slice

@@ -81,7 +81,7 @@ type HCNRequest struct {
 	sizeCache     protoimpl.SizeCache
 	unknownFields protoimpl.UnknownFields
 
-	Hcntype HCNType `protobuf:"varint,1,opt,name=hcntype,proto3,enum=winspect.hcn.HCNType" json:"hcntype,omitempty"`
+	Hcntype HCNType `protobuf:"varint,1,opt,name=hcntype,proto3,enum=wcnspect.hcn.HCNType" json:"hcntype,omitempty"`
 	Verbose bool    `protobuf:"varint,2,opt,name=verbose,proto3" json:"verbose,omitempty"`
 }
 
@@ -223,14 +223,14 @@ func file_hcn_proto_rawDescGZIP() []byte {
 var file_hcn_proto_enumTypes = make([]protoimpl.EnumInfo, 1)
 var file_hcn_proto_msgTypes = make([]protoimpl.MessageInfo, 2)
 var file_hcn_proto_goTypes = []interface{}{
-	(HCNType)(0),        // 0: winspect.hcn.HCNType
-	(*HCNRequest)(nil),  // 1: winspect.hcn.HCNRequest
-	(*HCNResponse)(nil), // 2: winspect.hcn.HCNResponse
+	(HCNType)(0),        // 0: wcnspect.hcn.HCNType
+	(*HCNRequest)(nil),  // 1: wcnspect.hcn.HCNRequest
+	(*HCNResponse)(nil), // 2: wcnspect.hcn.HCNResponse
 }
 var file_hcn_proto_depIdxs = []int32{
-	0, // 0: winspect.hcn.HCNRequest.hcntype:type_name -> winspect.hcn.HCNType
-	1, // 1: winspect.hcn.HCNService.GetHCNLogs:input_type -> winspect.hcn.HCNRequest
-	2, // 2: winspect.hcn.HCNService.GetHCNLogs:output_type -> winspect.hcn.HCNResponse
+	0, // 0: wcnspect.hcn.HCNRequest.hcntype:type_name -> wcnspect.hcn.HCNType
+	1, // 1: wcnspect.hcn.HCNService.GetHCNLogs:input_type -> wcnspect.hcn.HCNRequest
+	2, // 2: wcnspect.hcn.HCNService.GetHCNLogs:output_type -> wcnspect.hcn.HCNResponse
 	2, // [2:3] is the sub-list for method output_type
 	1, // [1:2] is the sub-list for method input_type
 	1, // [1:1] is the sub-list for extension type_name

@@ -1,13 +1,13 @@
 ---
 name: Feature request
-about: Suggest an idea for winspect
+about: Suggest an idea for wcnspect
 title: ''
 labels: ''
 assignees: ''
 
 ---
 
-**Component (Winspect Client or Server):**
+**Component (wcnspect Client or Server):**
 Is this feature request related to the Client or the Server
 
 **Is your feature request related to a problem? Please describe.**

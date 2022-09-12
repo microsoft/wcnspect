@@ -1,10 +1,10 @@
-# Contribution to Winspect
+# Contribution to wcnspect
 
-You can contribute to Winspect with issues and PRs. Simply filing issues for problems you encounter is a great way to contribute. Contributing implementations is also greatly appreciated.
+You can contribute to wcnspect with issues and PRs. Simply filing issues for problems you encounter is a great way to contribute. Contributing implementations is also greatly appreciated.
 
 ## Reporting Issues
 
-Before filing a new issue, please search our [open issues](https://github.com/microsoft/winspect/issues) to check if it already exists.
+Before filing a new issue, please search our [open issues](https://github.com/microsoft/wcnspect/issues) to check if it already exists.
 
 If you do find an existing issue, please include your own feedback in the discussion. Do consider upvoting (👍 reaction) the original post, as this helps us prioritize popular issues in our backlog.
 

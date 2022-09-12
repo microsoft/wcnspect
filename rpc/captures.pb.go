@@ -148,7 +148,7 @@ type Modifiers struct {
 	unknownFields protoimpl.UnknownFields
 
 	Pods         []string   `protobuf:"bytes,1,rep,name=pods,proto3" json:"pods,omitempty"`
-	PacketType   PacketType `protobuf:"varint,4,opt,name=packet_type,json=packetType,proto3,enum=winspect.captures.PacketType" json:"packet_type,omitempty"`
+	PacketType   PacketType `protobuf:"varint,4,opt,name=packet_type,json=packetType,proto3,enum=wcnspect.captures.PacketType" json:"packet_type,omitempty"`
 	CountersOnly bool       `protobuf:"varint,5,opt,name=counters_only,json=countersOnly,proto3" json:"counters_only,omitempty"`
 }
 
@@ -754,36 +754,36 @@ func file_captures_proto_rawDescGZIP() []byte {
 var file_captures_proto_enumTypes = make([]protoimpl.EnumInfo, 1)
 var file_captures_proto_msgTypes = make([]protoimpl.MessageInfo, 10)
 var file_captures_proto_goTypes = []interface{}{
-	(PacketType)(0),               // 0: winspect.captures.PacketType
-	(*Filters)(nil),               // 1: winspect.captures.Filters
-	(*Modifiers)(nil),             // 2: winspect.captures.Modifiers
-	(*Empty)(nil),                 // 3: winspect.captures.Empty
-	(*CaptureRequest)(nil),        // 4: winspect.captures.CaptureRequest
-	(*CountersRequest)(nil),       // 5: winspect.captures.CountersRequest
-	(*VFPCountersRequest)(nil),    // 6: winspect.captures.VFPCountersRequest
-	(*CaptureResponse)(nil),       // 7: winspect.captures.CaptureResponse
-	(*StopCaptureResponse)(nil),   // 8: winspect.captures.StopCaptureResponse
-	(*CountersResponse)(nil),      // 9: winspect.captures.CountersResponse
-	(*VFPCountersResponse)(nil),   // 10: winspect.captures.VFPCountersResponse
+	(PacketType)(0),               // 0: wcnspect.captures.PacketType
+	(*Filters)(nil),               // 1: wcnspect.captures.Filters
+	(*Modifiers)(nil),             // 2: wcnspect.captures.Modifiers
+	(*Empty)(nil),                 // 3: wcnspect.captures.Empty
+	(*CaptureRequest)(nil),        // 4: wcnspect.captures.CaptureRequest
+	(*CountersRequest)(nil),       // 5: wcnspect.captures.CountersRequest
+	(*VFPCountersRequest)(nil),    // 6: wcnspect.captures.VFPCountersRequest
+	(*CaptureResponse)(nil),       // 7: wcnspect.captures.CaptureResponse
+	(*StopCaptureResponse)(nil),   // 8: wcnspect.captures.StopCaptureResponse
+	(*CountersResponse)(nil),      // 9: wcnspect.captures.CountersResponse
+	(*VFPCountersResponse)(nil),   // 10: wcnspect.captures.VFPCountersResponse
 	(*timestamppb.Timestamp)(nil), // 11: google.protobuf.Timestamp
 }
 var file_captures_proto_depIdxs = []int32{
-	0,  // 0: winspect.captures.Modifiers.packet_type:type_name -> winspect.captures.PacketType
-	11, // 1: winspect.captures.CaptureRequest.timestamp:type_name -> google.protobuf.Timestamp
-	2,  // 2: winspect.captures.CaptureRequest.modifier:type_name -> winspect.captures.Modifiers
-	1,  // 3: winspect.captures.CaptureRequest.filter:type_name -> winspect.captures.Filters
-	11, // 4: winspect.captures.CaptureResponse.timestamp:type_name -> google.protobuf.Timestamp
-	11, // 5: winspect.captures.StopCaptureResponse.timestamp:type_name -> google.protobuf.Timestamp
-	11, // 6: winspect.captures.CountersResponse.timestamp:type_name -> google.protobuf.Timestamp
-	11, // 7: winspect.captures.VFPCountersResponse.timestamp:type_name -> google.protobuf.Timestamp
-	4,  // 8: winspect.captures.CaptureService.StartCapture:input_type -> winspect.captures.CaptureRequest
-	3,  // 9: winspect.captures.CaptureService.StopCapture:input_type -> winspect.captures.Empty
-	5,  // 10: winspect.captures.CaptureService.GetCounters:input_type -> winspect.captures.CountersRequest
-	6,  // 11: winspect.captures.CaptureService.GetVFPCounters:input_type -> winspect.captures.VFPCountersRequest
-	7,  // 12: winspect.captures.CaptureService.StartCapture:output_type -> winspect.captures.CaptureResponse
-	8,  // 13: winspect.captures.CaptureService.StopCapture:output_type -> winspect.captures.StopCaptureResponse
-	9,  // 14: winspect.captures.CaptureService.GetCounters:output_type -> winspect.captures.CountersResponse
-	10, // 15: winspect.captures.CaptureService.GetVFPCounters:output_type -> winspect.captures.VFPCountersResponse
+	0,  // 0: wcnspect.captures.Modifiers.packet_type:type_name -> wcnspect.captures.PacketType
+	11, // 1: wcnspect.captures.CaptureRequest.timestamp:type_name -> google.protobuf.Timestamp
+	2,  // 2: wcnspect.captures.CaptureRequest.modifier:type_name -> wcnspect.captures.Modifiers
+	1,  // 3: wcnspect.captures.CaptureRequest.filter:type_name -> wcnspect.captures.Filters
+	11, // 4: wcnspect.captures.CaptureResponse.timestamp:type_name -> google.protobuf.Timestamp
+	11, // 5: wcnspect.captures.StopCaptureResponse.timestamp:type_name -> google.protobuf.Timestamp
+	11, // 6: wcnspect.captures.CountersResponse.timestamp:type_name -> google.protobuf.Timestamp
+	11, // 7: wcnspect.captures.VFPCountersResponse.timestamp:type_name -> google.protobuf.Timestamp
+	4,  // 8: wcnspect.captures.CaptureService.StartCapture:input_type -> wcnspect.captures.CaptureRequest
+	3,  // 9: wcnspect.captures.CaptureService.StopCapture:input_type -> wcnspect.captures.Empty
+	5,  // 10: wcnspect.captures.CaptureService.GetCounters:input_type -> wcnspect.captures.CountersRequest
+	6,  // 11: wcnspect.captures.CaptureService.GetVFPCounters:input_type -> wcnspect.captures.VFPCountersRequest
+	7,  // 12: wcnspect.captures.CaptureService.StartCapture:output_type -> wcnspect.captures.CaptureResponse
+	8,  // 13: wcnspect.captures.CaptureService.StopCapture:output_type -> wcnspect.captures.StopCaptureResponse
+	9,  // 14: wcnspect.captures.CaptureService.GetCounters:output_type -> wcnspect.captures.CountersResponse
+	10, // 15: wcnspect.captures.CaptureService.GetVFPCounters:output_type -> wcnspect.captures.VFPCountersResponse
 	12, // [12:16] is the sub-list for method output_type
 	8,  // [8:12] is the sub-list for method input_type
 	8,  // [8:8] is the sub-list for extension type_name

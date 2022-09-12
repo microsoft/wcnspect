@@ -11,10 +11,10 @@ import (
 	"os/exec"
 	"time"
 
-	"github.com/microsoft/winspect/pkg/netutil"
-	"github.com/microsoft/winspect/pkg/pkt"
-	"github.com/microsoft/winspect/pkg/vfputil"
-	pb "github.com/microsoft/winspect/rpc"
+	"github.com/microsoft/wcnspect/pkg/netutil"
+	"github.com/microsoft/wcnspect/pkg/pkt"
+	"github.com/microsoft/wcnspect/pkg/vfputil"
+	pb "github.com/microsoft/wcnspect/rpc"
 
 	"google.golang.org/protobuf/types/known/timestamppb"
 )

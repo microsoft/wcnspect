@@ -2,18 +2,18 @@ apiVersion: apps/v1
 kind: DaemonSet
 metadata:
   labels:
-    app: winspect-server
-  name: winspect-server
+    app: wcnspect-server
+  name: wcnspect-server
   namespace: kube-system
 spec:
   selector:
     matchLabels:
-      app: winspect-server
+      app: wcnspect-server
   template:
     metadata:
       labels:
-        app: winspect-server
-      name: winspect-server
+        app: wcnspect-server
+      name: wcnspect-server
       namespace: kube-system
     spec:
       tolerations:
@@ -30,12 +30,12 @@ spec:
         runAsNonRoot: false
       hostNetwork: true
       containers:
-      - name: windowswinspectserver
-        image: nikosacr.azurecr.io/winspect:latest
+      - name: windowswcnspectserver
+        image: nikosacr.azurecr.io/wcnspect:latest
         command:
         - powershell.exe
         - -command
-        - ./winspectserv.exe # can add `-p {num}` here to change server's port
+        - ./wcnspectserv.exe # can add `-p {num}` here to change server's port
         securityContext:
           privileged: true
       nodeSelector:
