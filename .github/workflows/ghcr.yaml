@@ -1,0 +1,43 @@
+# yaml-language-server: $schema=https://json.schemastore.org/github-workflow.json
+
+name: wcnspect
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+    branches:
+      - main
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  packages: write
+
+jobs:
+  build:
+    name: Go build & push to ghcr
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v2
+      - name: Setup Go
+        uses: actions/setup-go@v3.3.0
+        with:
+          go-version: '1.18.3'
+      - name: login to GitHub container registry
+        uses: docker/login-action@v1
+        with:
+          registry: ghcr.io
+          username: ${{ github.repository_owner }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - name: build image
+        run: make server
+
+      - name: push image
+        if: ${{ github.event_name != 'pull_request' }}
+        shell: bash
+        run: |
+          docker buildx create --name img-builder --use --platform windows/amd64
+          docker buildx build --platform windows/amd64 --output=type=registry -f manifest/Dockerfile -t ghcr.io/microsoft/wcnspect:latest out/bin

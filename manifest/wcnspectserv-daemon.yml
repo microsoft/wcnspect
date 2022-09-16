@@ -31,7 +31,7 @@ spec:
       hostNetwork: true
       containers:
       - name: windowswcnspectserver
-        image: nikosacr.azurecr.io/wcnspect:latest
+        image: ghcr.io/microsoft/wcnspect:latest
         command:
         - powershell.exe
         - -command

@@ -4,12 +4,12 @@
 
 ## Features
 
-Currently, the wcnspect tool features four commands -
+Wcnspect features four commands:
 
-* Capture: runs a packet capture on Windows nodes, Has the capability to filter on pods, IPs, MACs, ports, protocols, and packet type (all, flow, or drop).
-* Counter: will retrieve packet counter tables from windows nodes. It only outputs a table on nodes currently running a capture.
-* Vfp-counter: will retrieve packet counter tables from the specified pod's VFP port. If specified, the counters from the Host vNIC VFP port and External Adapter VFP port.
-* Hns: will retrieve HNS logs from Windows nodes. Can specify `all`, `endpoints`, `loadbalancers`, `namespaces`, or `networks`. Can request json output.
+* `Capture`: runs a packet capture on Windows nodes, Has the capability to filter on pods, IPs, MACs, ports, protocols, and packet type (all, flow, or drop).
+* `Counter`: will retrieve packet counter tables from windows nodes. It only outputs a table on nodes currently running a capture.
+* `Vfp-counter`: will retrieve packet counter tables from the specified pod's VFP port. If specified, the counters from the Host vNIC VFP port and External Adapter VFP port.
+* `Hns`: will print HNS resources in Windows nodes. Can specify `all`, `endpoints`, `loadbalancers`, `namespaces`, or `networks`. Can request json output.
 
 ### Building
 
@@ -40,37 +40,18 @@ It should be noted that while the client is cross-platform, the server can only 
 
 ## Wcnspect Server
 
-### Deploying the wcnspect Server as a DaemonSet (Recommended)
+### Deploying the Wcnspect Server as a DaemonSet (Recommended)
 
-You can apply the [wcnspectserv-daemon.yml](manifest/wcnspectserv-daemon.yml) to deploy the server as a host process container on all Windows nodes. The only way to do this, as of now, is for the user to create their own Azure Container Registry (ACR) and upload the image through there.
+You can apply the [wcnspectserv-daemon.yml](manifest/wcnspectserv-daemon.yml) to deploy the server as a host process container on all Windows nodes. 
 
-The steps for using ACR are outlined <a href="https://docs.microsoft.com/en-us/azure/container-registry/container-registry-tutorial-quick-task" target="_blank">in these docs.</a>
-The [Dockerfile](manifest/Dockerfile) used for the original image is also contained in [manifest](./manifest). 
+The container image is published under `ghcr.io/microsoft/wcnspect:latest`. The [Dockerfile](manifest/Dockerfile) used for the image can be found [here](./manifest/Dockerfile). 
 
 Note that the [manifest](./manifest) directory also contains sample web server deployments for Windows Server 2019 and Windows Server 2022.
-
- 
-### Running wcnspect Server directly
-
-If you decide not to deploy the server as a container and manually download it to a node, then it must be run with elevated Administrator permissions. You can run it as follows:
-
-> running on the default port of 50051
-
-```shell
-./wcnspectserv
-```
-
-> running on a chosen port of 43058
-
-```shell
-./wcnspectserv -p 43058
-```
-> **NOTE: The wcnspect client only supports connecting to port 50051 currently**
 
 ## Wcnspect Client
 The client needs to be executed as a standalone binary from either a Windows or a Linux VM in the same network (jumpbox).
 
-The wcnspect client requires access to the [Kubernetes cluster config](https://kubernetes.io/docs/concepts/configuration/organize-cluster-access-kubeconfig/). 
+The Wcnspect client requires access to the [Kubernetes cluster config](https://kubernetes.io/docs/concepts/configuration/organize-cluster-access-kubeconfig/). 
 
 By default, Wcnspect client will search for a file named `config` in the `$HOME/.kube` directory. Otherwise, it will use the $KUBECONFIG environment variable.
 
@@ -114,8 +95,7 @@ wcnspect counter
 
 Currently, this project's code makes the following assumptions:
 
-* The port that wcnspect server uses is 50051 (this is currently required on the client-side).
-* When applying `wcnspectserv-daemon.yml`, the user has access to the ACR referenced in the file.
+* The port that Wcnspect server uses is 50051 (this is currently required on the client-side).
 
 ## TODO
   * Support for other ports on the Wcnspect client.
