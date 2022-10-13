@@ -27,32 +27,43 @@ type K8sapi struct {
 
 // Constructor for K8sapi
 func New(config string) K8sapi {
-	if config == "" {
-		// $HOME/.kube/config
-		home := homedir.HomeDir()
-		filename := filepath.Join(home, ".kube", "config")
+	kubeconfig := loadConfiguration(config)
 
-		// Check KUBECONFIG environment var
-		if conf, ok := os.LookupEnv(common.KubeConfigEnvVar); ok && len(conf) != 0 {
-			config = filepath.Clean(conf)
-			// Check $HOME/.kube/config
-		} else if _, err := ioutil.ReadFile(filename); err == nil {
-			config = filename
-		} else {
-			log.Fatal("Error reading $KUBECONFIG environment variable. Exiting...")
-		}
-	}
-	// Use the current context in kubeconfig
-	kubeconfig, err := clientcmd.BuildConfigFromFlags("", config)
-	if err != nil {
-		log.Fatalln("Error reading kubeconfig: ", err)
-	}
 	// Create the clientset
 	clientset, err := kubernetes.NewForConfig(kubeconfig)
 	if err != nil {
 		log.Fatalln("Error reading kubeconfig: ", err)
 	}
 	return K8sapi{kubeconfig, clientset}
+}
+
+func loadConfiguration(config string) *rest.Config {
+	kubeconfig, err := rest.InClusterConfig()
+	if err == nil {
+		log.Println("using in cluster config")
+		return kubeconfig
+	}
+
+	// $HOME/.kube/config
+	home := homedir.HomeDir()
+	filename := filepath.Join(home, ".kube", "config")
+
+	// Check KUBECONFIG environment var
+	if conf, ok := os.LookupEnv(common.KubeConfigEnvVar); ok && len(conf) != 0 {
+		config = filepath.Clean(conf)
+		// Check $HOME/.kube/config
+	} else if _, err := ioutil.ReadFile(filename); err == nil {
+		config = filename
+	} else {
+		log.Fatal("Error reading $KUBECONFIG environment variable. Exiting...")
+	}
+
+	// Use the current context in kubeconfig
+	kubeconfig, err = clientcmd.BuildConfigFromFlags("", config)
+	if err != nil {
+		log.Fatalln("Error reading kubeconfig: ", err)
+	}
+	return kubeconfig
 }
 
 func (k8sclient *K8sapi) GetPod(podName string, kubenamespace string) *v1.Pod {
@@ -98,7 +109,9 @@ func FilterNodes(nodes []v1.Node, test func(v1.Node) bool) (ret []v1.Node) {
 
 }
 
-/* Retrieves node names and ips given a list of nodes
+/*
+	Retrieves node names and ips given a list of nodes
+
 return map of node name to node ip
 */
 func GetNodesNameToIp(nodes []v1.Node) map[string]string {

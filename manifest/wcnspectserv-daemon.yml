@@ -33,9 +33,7 @@ spec:
       - name: windowswcnspectserver
         image: ghcr.io/microsoft/wcnspect:latest
         command:
-        - powershell.exe
-        - -command
-        - ./wcnspectserv.exe # can add `-p {num}` here to change server's port
+        - /hpc/wcnspectserv.exe # can add `-p {num}` here to change server's port
         securityContext:
           privileged: true
       nodeSelector:
