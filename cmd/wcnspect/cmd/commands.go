@@ -86,10 +86,12 @@ func (b *commandsBuilder) newwcnspectCmd() *wcnspectCmd {
 		Use:   "wcnspect",
 		Short: "wcnspect is an advanced distributed packet capture and HNS log collection tool.",
 		Long:  `An advanced distributed packet capture and HNS log collection tool made with Go (^_^)`,
+		PersistentPreRun: func(cmd *cobra.Command, args []string) {
+			cc.initializeAKSClusterValues()
+		},
 	})
 	cc.cmd.PersistentFlags().StringVar(&cc.kubeconfig, "kubeconfig", "", "Specify absolute path to the kubeconfig file.")
 	cc.cmd.CompletionOptions.DisableDefaultCmd = true
-	cc.initializeAKSClusterValues()
 
 	return cc
 }
