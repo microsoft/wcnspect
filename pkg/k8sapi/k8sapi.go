@@ -27,7 +27,10 @@ type K8sapi struct {
 
 // Constructor for K8sapi
 func New(config string) K8sapi {
-	kubeconfig := loadConfiguration(config)
+	kubeconfig, err := loadConfiguration(config)
+	if err != nil {
+		log.Fatalln("Error loading configuration: ", err)
+	}
 
 	// Create the clientset
 	clientset, err := kubernetes.NewForConfig(kubeconfig)
@@ -37,33 +40,32 @@ func New(config string) K8sapi {
 	return K8sapi{kubeconfig, clientset}
 }
 
-func loadConfiguration(config string) *rest.Config {
-	kubeconfig, err := rest.InClusterConfig()
-	if err == nil {
-		log.Println("using in cluster config")
-		return kubeconfig
+func loadConfiguration(configPath string) (*rest.Config, error) {
+	if configPath != "" {
+		return clientcmd.BuildConfigFromFlags("", configPath)
 	}
 
+	// Try to load InCluster Config
+	kubeconfig, err := rest.InClusterConfig()
+	if err == nil {
+		return kubeconfig, nil
+	}
+
+	// Try the default loctions and ENV variables
 	// $HOME/.kube/config
 	home := homedir.HomeDir()
 	filename := filepath.Join(home, ".kube", "config")
-
 	// Check KUBECONFIG environment var
 	if conf, ok := os.LookupEnv(common.KubeConfigEnvVar); ok && len(conf) != 0 {
-		config = filepath.Clean(conf)
+		configPath = filepath.Clean(conf)
 		// Check $HOME/.kube/config
 	} else if _, err := ioutil.ReadFile(filename); err == nil {
-		config = filename
+		configPath = filename
 	} else {
 		log.Fatal("Error reading $KUBECONFIG environment variable. Exiting...")
 	}
 
-	// Use the current context in kubeconfig
-	kubeconfig, err = clientcmd.BuildConfigFromFlags("", config)
-	if err != nil {
-		log.Fatalln("Error reading kubeconfig: ", err)
-	}
-	return kubeconfig
+	return clientcmd.BuildConfigFromFlags("", configPath)
 }
 
 func (k8sclient *K8sapi) GetPod(podName string, kubenamespace string) *v1.Pod {
